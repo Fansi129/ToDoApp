@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Watson Tasks</title>
+<style>
+:root {
+  --bg:#0e0e12; --surface:#16161d; --surface2:#1e1e28; --surface3:#26262f;
+  --border:#2e2e3a; --text:#e8e8f0; --text2:#7878a0; --text3:#4a4a70;
+  --accent:#7c6dfa; --accent-dim:#7c6dfa22;
+  --p1:#ef4444; --p2:#f97316; --p3:#3b82f6; --p4:#52525b;
+  --done-col:#22c55e; --radius:8px; --rail:44px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;overflow:hidden;}
+
+/* ── SETUP ──────────────────────────────────────────────────────────────────── */
+#setup{display:none;flex-direction:column;align-items:center;justify-content:center;width:100%;gap:16px;}
+#setup.show{display:flex;}
+#setup h1{font-size:24px;font-weight:700;}
+#setup p{color:var(--text2);font-size:14px;max-width:340px;text-align:center;line-height:1.6;}
+.setup-btn{background:var(--accent);border:none;color:#fff;padding:10px 24px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;transition:opacity .1s;}
+.setup-btn:hover{opacity:.85;}
+#setup-note{font-size:12px;color:var(--text3);}
+
+/* ── RAIL ───────────────────────────────────────────────────────────────────── */
+#rail{width:var(--rail);min-width:var(--rail);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:10px 0 8px;gap:8px;z-index:5;}
+#rail-toggle{background:none;border:none;color:var(--text3);cursor:pointer;padding:6px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:color .1s,background .1s;}
+#rail-toggle:hover{background:var(--surface2);color:var(--text);}
+#rail-dots{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:4px;}
+.rail-dot{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .1s,border-color .1s;flex-shrink:0;}
+.rail-dot:hover{transform:scale(1.15);}
+.rail-dot.active{border-color:#ffffff80;}
+.rail-dot[title]{position:relative;}
+
+/* ── APP CONTENT ────────────────────────────────────────────────────────────── */
+#app-content{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;}
+
+/* ── SIDEBAR PANEL ──────────────────────────────────────────────────────────── */
+#sidebar-panel{position:absolute;left:0;top:0;bottom:0;width:230px;background:var(--surface);border-right:1px solid var(--border);z-index:200;transform:translateX(-100%);transition:transform .2s ease;display:flex;flex-direction:column;overflow:hidden;}
+#sidebar-panel.open{transform:translateX(0);box-shadow:8px 0 32px #00000070;}
+#sidebar-back{display:none;position:absolute;inset:0;z-index:199;}
+#sidebar-back.show{display:block;}
+#sidebar-head{display:flex;align-items:center;justify-content:space-between;padding:14px 14px 10px;border-bottom:1px solid var(--border);}
+#sidebar-head span{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);}
+#sidebar-close{background:none;border:none;color:var(--text3);cursor:pointer;padding:4px;border-radius:4px;font-size:16px;line-height:1;transition:color .1s;}
+#sidebar-close:hover{color:var(--text);}
+#ws-list{flex:1;overflow-y:auto;padding:6px 8px;}
+.ws-row{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:var(--radius);cursor:pointer;font-size:13px;color:var(--text2);transition:background .1s,color .1s;user-select:none;}
+.ws-row:hover{background:var(--surface2);color:var(--text);}
+.ws-row.active{background:var(--accent-dim);color:var(--text);}
+.ws-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.ws-row-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ws-cnt{font-size:11px;color:var(--text3);background:var(--surface3);border-radius:10px;padding:1px 6px;min-width:18px;text-align:center;}
+.ws-row.active .ws-cnt{background:var(--accent-dim);color:var(--accent);}
+.ws-num{font-size:10px;color:var(--text3);}
+.proj-list{padding-left:20px;display:flex;flex-direction:column;gap:1px;margin-bottom:2px;}
+.proj-row{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:var(--radius);cursor:pointer;font-size:12px;color:var(--text3);transition:background .1s,color .1s;}
+.proj-row:hover{background:var(--surface2);color:var(--text2);}
+.proj-row.active{background:var(--surface3);color:var(--text);}
+.proj-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.proj-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.proj-cnt{font-size:10px;color:var(--text3);}
+.ws-add-proj{display:flex;align-items:center;gap:6px;padding:4px 8px;font-size:11px;color:var(--text3);cursor:pointer;border-radius:var(--radius);transition:color .1s;}
+.ws-add-proj:hover{color:var(--accent);}
+#add-ws-btn{margin:8px;padding:8px 12px;background:none;border:1px dashed var(--border);border-radius:var(--radius);color:var(--text3);font-size:13px;cursor:pointer;text-align:left;transition:border-color .1s,color .1s;}
+#add-ws-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* ── TOPBAR ─────────────────────────────────────────────────────────────────── */
+#topbar{display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--surface);}
+#topbar-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
+#topbar-name{font-size:15px;font-weight:600;}
+#topbar-proj{font-size:13px;color:var(--text3);margin-left:-4px;}
+#search-wrap{flex:1;display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 9px;gap:5px;transition:border-color .15s;}
+#search-wrap:focus-within{border-color:var(--accent);}
+#search-wrap svg{color:var(--text3);flex-shrink:0;}
+#search-input{background:none;border:none;outline:none;color:var(--text);font-size:13px;width:100%;}
+#search-input::placeholder{color:var(--text3);}
+#topbar-actions{display:flex;gap:2px;}
+.icon-btn{background:none;border:none;color:var(--text2);cursor:pointer;padding:6px;border-radius:6px;display:flex;align-items:center;transition:background .1s,color .1s;}
+.icon-btn:hover{background:var(--surface3);color:var(--text);}
+.icon-btn.on{color:var(--accent);}
+
+/* ── FILTER BAR ─────────────────────────────────────────────────────────────── */
+#filter-bar{display:flex;align-items:stretch;border-bottom:1px solid var(--border);background:var(--surface);overflow:hidden;}
+#time-pills{display:flex;align-items:center;gap:5px;padding:7px 14px;flex-shrink:0;}
+.filter-sep{width:1px;background:var(--border);margin:7px 0;flex-shrink:0;}
+#proj-pills{display:flex;align-items:center;gap:5px;padding:7px 14px;overflow-x:auto;flex:1;}
+#ms-pills{display:flex;align-items:center;gap:5px;padding:7px 14px;overflow-x:auto;border-left:1px solid var(--border);}
+.tpill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:none;color:var(--text2);transition:all .1s;white-space:nowrap;flex-shrink:0;}
+.tpill:hover{background:var(--surface2);color:var(--text);}
+.tpill.active{color:#fff;border-color:transparent;}
+.tpill.warn{color:var(--p1);}
+.ppill{padding:3px 10px;border-radius:20px;font-size:11px;cursor:pointer;border:1px solid var(--border);background:none;color:var(--text2);transition:all .1s;white-space:nowrap;flex-shrink:0;}
+.ppill:hover{background:var(--surface2);color:var(--text);}
+.ppill.active{color:#fff;border-color:transparent;}
+.ppill-edit{font-size:10px;opacity:0;padding:3px 4px;background:none;border:none;color:var(--text2);cursor:pointer;margin-left:-4px;}
+.ppill:hover+.ppill-edit,.ppill-edit:hover{opacity:1;}
+.pill-add{padding:3px 10px;border-radius:20px;font-size:11px;cursor:pointer;border:1px dashed var(--border);background:none;color:var(--text3);transition:all .1s;flex-shrink:0;}
+.pill-add:hover{border-color:var(--accent);color:var(--accent);}
+
+/* ── TODAY PROGRESS ─────────────────────────────────────────────────────────── */
+#today-bar{display:none;align-items:center;gap:12px;padding:8px 20px;background:var(--surface);border-bottom:1px solid var(--border);}
+#today-bar.show{display:flex;}
+#today-track{flex:1;height:4px;background:var(--surface3);border-radius:2px;overflow:hidden;}
+#today-fill{height:100%;background:var(--done-col);border-radius:2px;transition:width .3s ease;}
+#today-label{font-size:12px;color:var(--text2);white-space:nowrap;}
+
+/* ── UP NEXT ────────────────────────────────────────────────────────────────── */
+#up-next{margin:14px 20px 0;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:none;flex-direction:column;gap:8px;}
+#up-next.show{display:flex;}
+#un-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);}
+#un-title{font-size:16px;font-weight:600;}
+#un-row{display:flex;align-items:center;gap:8px;}
+#un-done{margin-left:auto;background:var(--accent);border:none;color:#fff;padding:5px 14px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:opacity .1s;}
+#un-done:hover{opacity:.85;}
+
+/* ── TASK AREA ──────────────────────────────────────────────────────────────── */
+#task-area{flex:1;overflow-y:auto;padding:8px 20px 6px;}
+#task-list{display:flex;flex-direction:column;gap:1px;}
+.sec-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);padding:9px 4px 3px;}
+#empty-state{display:none;flex-direction:column;align-items:center;padding:48px;color:var(--text3);font-size:13px;gap:8px;}
+#empty-state.show{display:flex;}
+.task-item{display:flex;flex-direction:column;border-radius:var(--radius);border:1px solid transparent;transition:background .1s;}
+.task-item:hover{background:var(--surface2);}
+.task-item.done{opacity:.36;}
+.task-item.done .task-title{text-decoration:line-through;}
+.task-item.drag-over{border-color:var(--accent);background:var(--accent-dim);}
+.task-row{display:flex;align-items:center;gap:8px;padding:7px 9px;}
+.drag-handle{color:var(--text3);cursor:grab;opacity:0;transition:opacity .1s;flex-shrink:0;font-size:12px;line-height:1;}
+.task-item:hover .drag-handle{opacity:1;}
+.task-check{width:17px;height:17px;border-radius:50%;border:2px solid var(--border);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:border-color .1s,background .1s;}
+.task-check:hover{border-color:var(--done-col);}
+.task-item.done .task-check{background:var(--done-col);border-color:var(--done-col);}
+.chk-svg{display:none;}
+.task-item.done .chk-svg{display:block;}
+.task-title{flex:1;font-size:14px;cursor:pointer;user-select:none;}
+.task-title:hover{color:var(--accent);}
+.badges{display:flex;align-items:center;gap:4px;flex-shrink:0;}
+.pbadge{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;letter-spacing:.04em;}
+.p1{background:#ef444420;color:var(--p1);}
+.p2{background:#f9731620;color:var(--p2);}
+.p3{background:#3b82f620;color:var(--p3);}
+.p4{background:#52525b20;color:var(--p4);}
+.dbadge{font-size:11px;padding:2px 6px;border-radius:4px;background:var(--surface3);color:var(--text2);}
+.dbadge.overdue{background:#ef444420;color:var(--p1);}
+.dbadge.today{background:#f9731620;color:var(--p2);}
+.tagbadge{font-size:10px;padding:2px 6px;border-radius:4px;color:#fff;opacity:.8;}
+.notes-dot{width:5px;height:5px;border-radius:50%;background:var(--text3);flex-shrink:0;}
+.recur-icon{font-size:11px;color:var(--text3);flex-shrink:0;}
+.task-del{opacity:0;background:none;border:none;color:var(--text3);cursor:pointer;padding:2px 4px;border-radius:4px;font-size:16px;line-height:1;transition:color .1s;flex-shrink:0;}
+.task-item:hover .task-del{opacity:1;}
+.task-del:hover{color:var(--p1);}
+.task-expand{display:none;padding:0 9px 9px 40px;flex-direction:column;gap:6px;}
+.task-expand.open{display:flex;}
+.notes-ta{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:13px;font-family:inherit;resize:vertical;min-height:52px;outline:none;width:100%;transition:border-color .1s;}
+.notes-ta:focus{border-color:var(--accent);}
+.expand-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.exp-input,.exp-sel{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:4px 7px;font-size:12px;outline:none;transition:border-color .1s;}
+.exp-input:focus,.exp-sel:focus{border-color:var(--accent);}
+.exp-sel{cursor:pointer;}
+
+/* ── ADD BAR ────────────────────────────────────────────────────────────────── */
+#add-bar{padding:8px 20px 13px;border-top:1px solid var(--border);background:var(--surface);}
+#add-form{display:flex;gap:5px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:6px 9px;align-items:center;transition:border-color .15s;flex-wrap:wrap;}
+#add-form:focus-within{border-color:var(--accent);}
+#task-input{flex:1;min-width:120px;background:none;border:none;outline:none;color:var(--text);font-size:14px;}
+#task-input::placeholder{color:var(--text3);}
+.fsep{width:1px;height:15px;background:var(--border);flex-shrink:0;}
+.fsel{background:none;border:none;color:var(--text2);font-size:12px;padding:2px 3px;cursor:pointer;outline:none;}
+#add-due{background:none;border:none;outline:none;color:var(--text2);font-size:12px;cursor:pointer;width:100px;}
+#add-due::-webkit-calendar-picker-indicator{filter:invert(.5);cursor:pointer;}
+#add-btn{background:var(--accent);border:none;color:#fff;padding:4px 13px;border-radius:5px;font-size:13px;font-weight:500;cursor:pointer;transition:opacity .1s;flex-shrink:0;}
+#add-btn:hover{opacity:.85;}
+
+/* ── MISC ───────────────────────────────────────────────────────────────────── */
+#no-ws{display:none;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:10px;color:var(--text2);font-size:14px;}
+#no-ws.show{display:flex;}
+#save-ind{position:fixed;bottom:14px;right:14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 11px;font-size:12px;color:var(--text2);opacity:0;transition:opacity .2s;pointer-events:none;z-index:9999;}
+#save-ind.show{opacity:1;}
+
+/* ── MODALS ─────────────────────────────────────────────────────────────────── */
+.overlay{display:none;position:fixed;inset:0;background:#00000088;z-index:500;align-items:center;justify-content:center;}
+.overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;width:300px;display:flex;flex-direction:column;gap:13px;}
+.modal h3{font-size:14px;font-weight:600;}
+.mfield{display:flex;flex-direction:column;gap:5px;}
+.mfield label{font-size:11px;color:var(--text2);}
+.minput{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:13px;outline:none;transition:border-color .1s;}
+.minput:focus{border-color:var(--accent);}
+.cpicker{display:flex;gap:6px;flex-wrap:wrap;}
+.cswatch{width:21px;height:21px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .1s;}
+.cswatch.sel{border-color:#fff;}
+.mactions{display:flex;gap:7px;justify-content:flex-end;}
+.btn-sec{background:var(--surface3);border:1px solid var(--border);color:var(--text2);padding:6px 13px;border-radius:6px;font-size:13px;cursor:pointer;}
+.btn-sec:hover{color:var(--text);}
+.btn-pri{background:var(--accent);border:none;color:#fff;padding:6px 13px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:opacity .1s;}
+.btn-pri:hover{opacity:.85;}
+.btn-del{background:#ef444420;border:1px solid #ef444440;color:var(--p1);padding:6px 13px;border-radius:6px;font-size:13px;cursor:pointer;margin-right:auto;}
+.btn-del:hover{background:#ef444430;}
+
+::-webkit-scrollbar{width:4px;} ::-webkit-scrollbar-track{background:transparent;} ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+</style>
+</head>
+<body>
+
+<!-- Setup screen -->
+<div id="setup" class="show">
+  <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#7c6dfa" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+  <h1>Watson Tasks</h1>
+  <p id="setup-msg">Pick a local folder — tasks are stored as individual JSON files. Nothing leaves your machine.</p>
+  <button class="setup-btn" id="setup-btn" onclick="pickFolder()">Open tasks folder</button>
+  <span id="setup-note">Requires Chrome or Edge (File System Access API)</span>
+</div>
+
+<!-- Rail (always visible) -->
+<div id="rail" style="display:none">
+  <button id="rail-toggle" onclick="toggleSidebar()" title="Workspaces (W)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <div id="rail-dots"></div>
+</div>
+
+<!-- App content -->
+<div id="app-content" style="display:none">
+
+  <!-- Sidebar backdrop -->
+  <div id="sidebar-back" onclick="closeSidebar()"></div>
+
+  <!-- Sidebar panel -->
+  <div id="sidebar-panel">
+    <div id="sidebar-head">
+      <span>Workspaces</span>
+      <button id="sidebar-close" onclick="closeSidebar()">✕</button>
+    </div>
+    <div id="ws-list"></div>
+    <button id="add-ws-btn" onclick="openWsModal()">+ New workspace</button>
+  </div>
+
+  <!-- Main -->
+  <div id="no-ws"><span>Create a workspace to get started</span></div>
+  <div id="ws-view" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+
+    <div id="topbar">
+      <div id="topbar-dot"></div>
+      <div id="topbar-name"></div>
+      <span id="topbar-proj"></span>
+      <div id="search-wrap">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="search-input" placeholder="Search… (/)">
+      </div>
+      <div id="topbar-actions">
+        <button class="icon-btn" onclick="openWsModal(true)" title="Edit workspace">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="icon-btn" id="done-toggle" onclick="toggleShowDone()" title="Show completed">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter bar: time | projects | milestones -->
+    <div id="filter-bar">
+      <div id="time-pills"></div>
+      <div class="filter-sep"></div>
+      <div id="proj-pills"></div>
+      <div id="ms-pills"></div>
+    </div>
+
+    <!-- Today progress bar -->
+    <div id="today-bar">
+      <span id="today-label">Today</span>
+      <div id="today-track"><div id="today-fill" style="width:0%"></div></div>
+    </div>
+
+    <div id="up-next">
+      <div id="un-label">Up Next</div>
+      <div id="un-title"></div>
+      <div id="un-row">
+        <span id="un-badge" class="pbadge"></span>
+        <span id="un-due" class="dbadge" style="display:none"></span>
+        <button id="un-done" onclick="completeUpNext()">Mark done</button>
+      </div>
+    </div>
+
+    <div id="task-area">
+      <div id="empty-state">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        No tasks here
+      </div>
+      <div id="task-list"></div>
+    </div>
+
+    <div id="add-bar">
+      <div id="add-form">
+        <input id="task-input" type="text" placeholder="New task… (N)" autocomplete="off">
+        <div class="fsep"></div>
+        <input id="add-due" type="date" title="Due date">
+        <div class="fsep"></div>
+        <select id="add-pri" class="fsel">
+          <option value="1">P1</option>
+          <option value="2">P2</option>
+          <option value="3" selected>P3</option>
+          <option value="4">P4</option>
+        </select>
+        <div class="fsep"></div>
+        <select id="add-proj-sel" class="fsel"></select>
+        <div class="fsep"></div>
+        <select id="add-ms-sel" class="fsel"></select>
+        <button id="add-btn" onclick="addTask()">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="save-ind">Saving…</div>
+
+<!-- Workspace Modal -->
+<div id="ws-overlay" class="overlay" onclick="overlayClick(event,'ws-overlay')">
+  <div class="modal">
+    <h3 id="ws-modal-title">New Workspace</h3>
+    <div class="mfield"><label>Name</label><input id="ws-name" class="minput" type="text" placeholder="e.g. GameReady"></div>
+    <div class="mfield"><label>Color</label><div class="cpicker" id="ws-cpicker"></div></div>
+    <div class="mactions">
+      <button id="ws-del-btn" class="btn-del" onclick="deleteWs()" style="display:none">Delete</button>
+      <button class="btn-sec" onclick="closeOverlay('ws-overlay')">Cancel</button>
+      <button class="btn-pri" id="ws-save-btn" onclick="saveWs()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Project Modal -->
+<div id="proj-overlay" class="overlay" onclick="overlayClick(event,'proj-overlay')">
+  <div class="modal">
+    <h3 id="proj-modal-title">New Project</h3>
+    <div class="mfield"><label>Name</label><input id="proj-name" class="minput" type="text" placeholder="e.g. AquaAssault"></div>
+    <div class="mfield"><label>Color</label><div class="cpicker" id="proj-cpicker"></div></div>
+    <div class="mactions">
+      <button id="proj-del-btn" class="btn-del" onclick="deleteProj()" style="display:none">Delete</button>
+      <button class="btn-sec" onclick="closeOverlay('proj-overlay')">Cancel</button>
+      <button class="btn-pri" id="proj-save-btn" onclick="saveProj()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Milestone Modal -->
+<div id="ms-overlay" class="overlay" onclick="overlayClick(event,'ms-overlay')">
+  <div class="modal">
+    <h3 id="ms-modal-title">New Milestone</h3>
+    <div class="mfield"><label>Name</label><input id="ms-name" class="minput" type="text" placeholder="e.g. v1.0 Launch"></div>
+    <div class="mfield"><label>Color</label><div class="cpicker" id="ms-cpicker"></div></div>
+    <div class="mactions">
+      <button id="ms-del-btn" class="btn-del" onclick="deleteMs()" style="display:none">Delete</button>
+      <button class="btn-sec" onclick="closeOverlay('ms-overlay')">Cancel</button>
+      <button class="btn-pri" id="ms-save-btn" onclick="saveMs()">Create</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONSTANTS ────────────────────────────────────────────────────────────────
+const COLORS = ['#7c6dfa','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6','#a855f7','#ec4899','#64748b'];
+const PNAMES = ['','Critical','High','Normal','Low'];
+const TODAY = new Date().toISOString().slice(0,10);
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let rootDir = null, tasksDir = null;
+let S = { workspaces: [], tasks: [], activeId: null };
+
+let sidebarOpen = false;
+let timeFilter = 'today';
+let projFilter = 'all';
+let msFilter = 'all';
+let showDone = false;
+let searchQ = '';
+let expandId = null;
+let dragSrc = null, dragSrcP = null;
+let notesTimer = {};
+
+// Modal state
+let editWsId = null, wsColor = COLORS[0];
+let editProjId = null, projColor = COLORS[4];
+let editMsId = null, msColor = COLORS[5];
+
+// ── FILE SYSTEM ───────────────────────────────────────────────────────────────
+async function pickFolder() {
+  try {
+    rootDir = await window.showDirectoryPicker({ mode: 'readwrite', id: 'watson-tasks' });
+    await idbSet('wt-dir', rootDir);
+    await initFromDir();
+  } catch(e) { if (e.name !== 'AbortError') alert('Could not open folder: ' + e.message); }
+}
+
+async function tryRestoreDir() {
+  const stored = await idbGet('wt-dir');
+  if (!stored) return 'none';
+  try {
+    const perm = await stored.queryPermission({ mode: 'readwrite' });
+    if (perm === 'granted') { rootDir = stored; return 'granted'; }
+    // 'prompt' — need a user gesture to requestPermission
+    if (perm === 'prompt') { window._storedDir = stored; return 'prompt'; }
+  } catch {}
+  return 'none';
+}
+
+async function resumeDir() {
+  const stored = window._storedDir;
+  if (!stored) { pickFolder(); return; }
+  try {
+    const req = await stored.requestPermission({ mode: 'readwrite' });
+    if (req === 'granted') { rootDir = stored; await initFromDir(); }
+    else { pickFolder(); }
+  } catch { pickFolder(); }
+}
+
+async function initFromDir() {
+  tasksDir = await rootDir.getDirectoryHandle('tasks', { create: true });
+  const wsData = await readJSON('workspaces.json');
+  if (wsData) {
+    S.workspaces = (wsData.workspaces || []).map(migrateWs);
+    S.activeId = wsData.activeId || S.workspaces[0]?.id || null;
+  } else {
+    S.workspaces = SEED_WORKSPACES;
+    S.activeId = 'ws-gr';
+    await writeJSON('workspaces.json', { workspaces: S.workspaces, activeId: S.activeId });
+    for (const t of SEED_TASKS) await writeTaskFile(t);
+  }
+  const saved = localStorage.getItem('wt-active');
+  if (saved && S.workspaces.find(w => w.id === saved)) S.activeId = saved;
+  const savedTF = localStorage.getItem('wt-tf');
+  if (savedTF) timeFilter = savedTF;
+  S.tasks = await loadAllTasks();
+  showApp();
+  render();
+}
+
+function migrateWs(w) {
+  return { ...w, projects: (w.projects || []).map(p => ({ ...p, milestones: p.milestones || [] })) };
+}
+
+async function loadAllTasks() {
+  const tasks = [];
+  for await (const [name, handle] of tasksDir) {
+    if (handle.kind === 'file' && name.endsWith('.json')) {
+      try { const f = await handle.getFile(); tasks.push(JSON.parse(await f.text())); } catch {}
+    }
+  }
+  return tasks;
+}
+
+async function writeTaskFile(t) {
+  const fh = await tasksDir.getFileHandle(`${t.id}.json`, { create: true });
+  const w = await fh.createWritable(); await w.write(JSON.stringify(t, null, 2)); await w.close();
+}
+
+async function deleteTaskFile(id) {
+  try { await tasksDir.removeEntry(`${id}.json`); } catch {}
+}
+
+async function readJSON(name) {
+  try { const fh = await rootDir.getFileHandle(name); const f = await fh.getFile(); return JSON.parse(await f.text()); } catch { return null; }
+}
+
+async function writeJSON(name, data) {
+  const fh = await rootDir.getFileHandle(name, { create: true });
+  const w = await fh.createWritable(); await w.write(JSON.stringify(data, null, 2)); await w.close();
+}
+
+async function saveWsFile() { await writeJSON('workspaces.json', { workspaces: S.workspaces, activeId: S.activeId }); }
+
+function flashSave() {
+  const el = document.getElementById('save-ind'); el.className = 'show';
+  clearTimeout(flashSave._t); flashSave._t = setTimeout(() => el.className = '', 1200);
+}
+
+async function persist(t) { flashSave(); await writeTaskFile(t); }
+
+// ── IDB ───────────────────────────────────────────────────────────────────────
+function idbOpen() {
+  return new Promise((res,rej) => { const r=indexedDB.open('wt',1); r.onupgradeneeded=e=>e.target.result.createObjectStore('kv'); r.onsuccess=e=>res(e.target.result); r.onerror=()=>rej(r.error); });
+}
+async function idbGet(k) { try { const db=await idbOpen(); return new Promise(res=>{ const t=db.transaction('kv','readonly'); const r=t.objectStore('kv').get(k); r.onsuccess=()=>res(r.result??null); r.onerror=()=>res(null); }); } catch { return null; } }
+async function idbSet(k,v) { try { const db=await idbOpen(); return new Promise(res=>{ const t=db.transaction('kv','readwrite'); t.objectStore('kv').put(v,k); t.oncomplete=res; }); } catch {} }
+
+// ── SHOW APP ──────────────────────────────────────────────────────────────────
+function showApp() {
+  document.getElementById('setup').className = '';
+  document.getElementById('rail').style.display = 'flex';
+  document.getElementById('app-content').style.display = 'flex';
+}
+
+// ── SIDEBAR ───────────────────────────────────────────────────────────────────
+function toggleSidebar() { sidebarOpen ? closeSidebar() : openSidebar(); }
+function openSidebar() {
+  sidebarOpen = true;
+  document.getElementById('sidebar-panel').classList.add('open');
+  document.getElementById('sidebar-back').classList.add('show');
+  renderSidebarPanel();
+}
+function closeSidebar() {
+  sidebarOpen = false;
+  document.getElementById('sidebar-panel').classList.remove('open');
+  document.getElementById('sidebar-back').classList.remove('show');
+}
+
+function renderSidebarPanel() {
+  const list = document.getElementById('ws-list');
+  list.innerHTML = '';
+  S.workspaces.forEach((w, i) => {
+    const cnt = wsTasks(w.id).filter(t => !t.done).length;
+    const isActive = w.id === S.activeId;
+    // Workspace row
+    const row = el('div', 'ws-row' + (isActive ? ' active' : ''));
+    row.innerHTML = `<span class="ws-dot" style="background:${w.color}"></span><span class="ws-row-name">${esc(w.name)}</span>${cnt?`<span class="ws-cnt">${cnt}</span>`:''}<span class="ws-num">${i<9?i+1:''}</span>`;
+    row.onclick = () => { S.activeId=w.id; projFilter='all'; msFilter='all'; closeSidebar(); render(); };
+    list.appendChild(row);
+    // Projects (only under active workspace)
+    if (isActive) {
+      const projList = el('div', 'proj-list');
+      (w.projects||[]).forEach(p => {
+        const pcnt = wsTasks(w.id).filter(t=>!t.done&&t.project===p.id).length;
+        const prow = el('div', 'proj-row' + (projFilter===p.id?' active':''));
+        prow.innerHTML = `<span class="proj-dot" style="background:${p.color}"></span><span class="proj-name">${esc(p.name)}</span>${pcnt?`<span class="proj-cnt">${pcnt}</span>`:''}`;
+        prow.onclick = e => { e.stopPropagation(); S.activeId=w.id; projFilter=p.id; msFilter='all'; closeSidebar(); render(); };
+        projList.appendChild(prow);
+      });
+      // Add project button
+      const addP = el('div', 'ws-add-proj');
+      addP.innerHTML = '+ New project';
+      addP.onclick = e => { e.stopPropagation(); openProjModal(); };
+      projList.appendChild(addP);
+      list.appendChild(projList);
+    }
+  });
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function render() {
+  localStorage.setItem('wt-active', S.activeId || '');
+  localStorage.setItem('wt-tf', timeFilter);
+  renderRail();
+  renderMain();
+}
+
+function renderRail() {
+  const dots = document.getElementById('rail-dots');
+  dots.innerHTML = '';
+  S.workspaces.forEach(w => {
+    const d = el('div', 'rail-dot' + (w.id===S.activeId?' active':''));
+    d.style.background = w.color;
+    d.title = w.name;
+    d.onclick = () => { S.activeId=w.id; projFilter='all'; msFilter='all'; render(); if(sidebarOpen)renderSidebarPanel(); };
+    dots.appendChild(d);
+  });
+}
+
+function renderMain() {
+  const w = S.workspaces.find(x=>x.id===S.activeId);
+  document.getElementById('no-ws').className = w ? '' : 'show';
+  const view = document.getElementById('ws-view');
+  if (!w) { view.style.display='none'; return; }
+  view.style.display = 'flex';
+
+  // Topbar
+  document.getElementById('topbar-dot').style.background = w.color;
+  document.getElementById('topbar-name').textContent = w.name;
+  const proj = (w.projects||[]).find(p=>p.id===projFilter);
+  document.getElementById('topbar-proj').textContent = proj ? ` / ${proj.name}` : '';
+
+  renderFilterBar(w);
+  renderTodayBar(w);
+  renderUpNext(w);
+  renderTasks(w);
+  renderAddSelects(w);
+}
+
+function renderFilterBar(w) {
+  // Time pills
+  const tp = document.getElementById('time-pills');
+  tp.innerHTML = '';
+  const wt = wsTasks(w.id);
+  const E3 = endOf3Days(), EW = endOfWeek();
+  const todayDone = wt.filter(t=>t.done&&t.doneAt&&new Date(t.doneAt).toISOString().slice(0,10)===TODAY).length +
+    wt.filter(t=>t.done&&t.dueDate===TODAY).length;
+  // unique today done
+  const todayTasks = wt.filter(t=>t.dueDate===TODAY);
+  const todayDoneCount = todayTasks.filter(t=>t.done).length;
+  const todayTotal = todayTasks.length;
+
+  const timeOpts = [
+    { key:'all', label:'All', count: null },
+    { key:'overdue', label:'Overdue', count: wt.filter(t=>!t.done&&t.dueDate&&t.dueDate<TODAY).length, warn:true },
+    { key:'today', label:'Today', count: todayTotal, done: todayDoneCount },
+    { key:'3days', label:'3 Days', count: wt.filter(t=>!t.done&&t.dueDate&&t.dueDate>=TODAY&&t.dueDate<=E3).length },
+    { key:'week', label:'Week', count: wt.filter(t=>!t.done&&t.dueDate&&t.dueDate>=TODAY&&t.dueDate<=EW).length },
+  ];
+  timeOpts.forEach(opt => {
+    let label = opt.label;
+    if (opt.key==='today' && opt.count>0) label = `Today ${opt.done}/${opt.count}`;
+    else if (opt.count != null && opt.count > 0) label = `${opt.label} ${opt.count}`;
+    const pill = mkBtn('tpill' + (timeFilter===opt.key?' active':'') + (opt.warn&&opt.count>0&&timeFilter!==opt.key?' warn':''), label);
+    if (timeFilter===opt.key) pill.style.background = w.color;
+    pill.onclick = () => { timeFilter=opt.key; render(); };
+    tp.appendChild(pill);
+  });
+
+  // Project pills
+  const pp = document.getElementById('proj-pills');
+  pp.innerHTML = '';
+  if ((w.projects||[]).length > 0) {
+    const allP = mkBtn('ppill' + (projFilter==='all'?' active':''), 'All');
+    if (projFilter==='all') allP.style.background = w.color;
+    allP.onclick = () => { projFilter='all'; render(); };
+    pp.appendChild(allP);
+    (w.projects||[]).forEach(p => {
+      const pcnt = wt.filter(t=>!t.done&&t.project===p.id).length;
+      const pill = mkBtn('ppill' + (projFilter===p.id?' active':''), pcnt ? `${esc(p.name)} ${pcnt}` : esc(p.name));
+      if (projFilter===p.id) pill.style.background = p.color;
+      pill.onclick = () => { projFilter=p.id; render(); };
+      pp.appendChild(pill);
+      const editBtn = mkBtn('ppill-edit', '✎');
+      editBtn.onclick = e => { e.stopPropagation(); openProjModal(p.id); };
+      pp.appendChild(editBtn);
+    });
+  }
+  const addProjBtn = mkBtn('pill-add', '+ Project');
+  addProjBtn.onclick = () => openProjModal(null);
+  pp.appendChild(addProjBtn);
+
+  // Milestone pills (workspace-level, shown if any exist)
+  const mp = document.getElementById('ms-pills');
+  mp.innerHTML = '';
+  const allMs = (w.projects||[]).flatMap(p=>(p.milestones||[]).map(m=>({...m,projColor:p.color})));
+  // Also workspace-level milestones (legacy)
+  const wsMs = w.milestones || [];
+  const combined = [...wsMs.map(m=>({...m})), ...allMs];
+  if (combined.length > 0) {
+    mp.style.borderLeft = '1px solid var(--border)';
+    const allM = mkBtn('ppill' + (msFilter==='all'?' active':''), 'All ms');
+    if (msFilter==='all') allM.style.background = '#444';
+    allM.onclick = () => { msFilter='all'; render(); };
+    mp.appendChild(allM);
+    combined.forEach(ms => {
+      const pill = mkBtn('ppill' + (msFilter===ms.id?' active':''), esc(ms.name));
+      if (msFilter===ms.id) pill.style.background = ms.color || ms.projColor || '#666';
+      pill.onclick = () => { msFilter=ms.id; render(); };
+      mp.appendChild(pill);
+    });
+    const addMs = mkBtn('pill-add', '+ Milestone');
+    addMs.onclick = () => openMsModal(null);
+    mp.appendChild(addMs);
+  } else {
+    mp.style.borderLeft = '';
+    mp.innerHTML = '';
+  }
+}
+
+function renderTodayBar(w) {
+  const bar = document.getElementById('today-bar');
+  if (timeFilter !== 'today') { bar.className = ''; return; }
+  const todayTasks = wsTasks(w.id).filter(t => {
+    if (t.dueDate !== TODAY) return false;
+    if (projFilter !== 'all' && t.project !== projFilter) return false;
+    if (msFilter !== 'all' && t.milestoneId !== msFilter) return false;
+    return true;
+  });
+  const done = todayTasks.filter(t=>t.done).length;
+  const total = todayTasks.length;
+  bar.className = 'show';
+  document.getElementById('today-fill').style.width = total ? `${Math.round(done/total*100)}%` : '0%';
+  document.getElementById('today-label').textContent = total ? `Today — ${done} of ${total} done` : 'Today — no tasks due';
+}
+
+function renderUpNext(w) {
+  const active = visibleTasks(w).filter(t=>!t.done).sort(byPri);
+  const el2 = document.getElementById('up-next');
+  if (!active.length) { el2.className = ''; return; }
+  el2.className = 'show';
+  const top = active[0];
+  document.getElementById('un-title').textContent = top.title;
+  const b = document.getElementById('un-badge');
+  b.textContent = `P${top.priority}`; b.className = `pbadge p${top.priority}`;
+  const d = document.getElementById('un-due');
+  if (top.dueDate) { d.textContent=fmtDate(top.dueDate); d.className=`dbadge ${dueCls(top.dueDate)}`; d.style.display=''; }
+  else d.style.display='none';
+}
+
+function renderTasks(w) {
+  const list = document.getElementById('task-list');
+  list.innerHTML = '';
+  const visible = visibleTasks(w);
+  const active = visible.filter(t=>!t.done).sort(byPri);
+  const done = visible.filter(t=>t.done).sort((a,b)=>(b.doneAt||0)-(a.doneAt||0));
+  document.getElementById('empty-state').className = (!active.length && (!showDone||!done.length)) ? 'show' : '';
+
+  [1,2,3,4].forEach(p => {
+    const grp = active.filter(t=>t.priority===p);
+    if (!grp.length) return;
+    list.appendChild(secLabel(`P${p} · ${PNAMES[p]}`));
+    grp.forEach(t => list.appendChild(taskEl(t, w)));
+  });
+  if (showDone && done.length) {
+    list.appendChild(secLabel(`Completed · ${done.length}`));
+    done.forEach(t => list.appendChild(taskEl(t, w)));
+  }
+}
+
+function visibleTasks(w) {
+  const q = searchQ.toLowerCase();
+  return wsTasks(w.id).filter(t => {
+    if (!matchTime(t)) return false;
+    if (projFilter !== 'all' && (t.project||null) !== projFilter) return false;
+    if (msFilter !== 'all' && (t.milestoneId||null) !== msFilter) return false;
+    if (q && !t.title.toLowerCase().includes(q) && !(t.notes||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+function taskEl(t, w) {
+  const proj = (w.projects||[]).find(p=>p.id===t.project);
+  const allMs = (w.projects||[]).flatMap(p=>(p.milestones||[]))||[];
+  const wsMs = w.milestones||[];
+  const ms = [...wsMs,...allMs].find(m=>m.id===t.milestoneId);
+  const open = expandId===t.id;
+  const div = el('div', 'task-item'+(t.done?' done':''));
+  div.dataset.id = t.id;
+  div.draggable = true;
+  div.ondragstart = ()=>{dragSrc=t.id;dragSrcP=t.priority;};
+  div.ondragover = e => {
+    if (t.id===dragSrc||t.priority!==dragSrcP) return;
+    e.preventDefault();
+    document.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));
+    div.classList.add('drag-over');
+  };
+  div.ondragleave = ()=>div.classList.remove('drag-over');
+  div.ondrop = e => {
+    e.preventDefault();
+    if (!dragSrc||t.id===dragSrc||t.priority!==dragSrcP) return;
+    const src=S.tasks.find(x=>x.id===dragSrc), tgt=S.tasks.find(x=>x.id===t.id);
+    if (src&&tgt){const tmp=src.order;src.order=tgt.order;tgt.order=tmp;persist(src);persist(tgt);}
+    dragSrc=null; div.classList.remove('drag-over'); render();
+  };
+
+  // Build milestone options for expand form
+  const msOpts = [...(w.milestones||[]), ...(w.projects||[]).flatMap(p=>(p.milestones||[]))];
+
+  div.innerHTML = `
+    <div class="task-row">
+      <span class="drag-handle">⠿</span>
+      <div class="task-check" onclick="toggleDone('${t.id}')">
+        <svg class="chk-svg" width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.5"><polyline points="1.5 6 4.5 9 10.5 3"/></svg>
+      </div>
+      <span class="task-title" onclick="toggleExpand('${t.id}')">${esc(t.title)}</span>
+      <span class="badges">
+        ${t.notes?'<span class="notes-dot"></span>':''}
+        ${t.recur?'<span class="recur-icon" title="Repeating">↻</span>':''}
+        ${proj?`<span class="tagbadge" style="background:${proj.color}">${esc(proj.name)}</span>`:''}
+        ${ms?`<span class="tagbadge" style="background:${ms.color||'#666'}">${esc(ms.name)}</span>`:''}
+        ${t.dueDate?`<span class="dbadge ${dueCls(t.dueDate)}">${fmtDate(t.dueDate)}</span>`:''}
+        <span class="pbadge p${t.priority}">P${t.priority}</span>
+      </span>
+      <button class="task-del" onclick="delTask('${t.id}')">×</button>
+    </div>
+    <div class="task-expand ${open?'open':''}">
+      <textarea class="notes-ta" placeholder="Notes…" oninput="queueSaveNotes('${t.id}',this.value)">${esc(t.notes||'')}</textarea>
+      <div class="expand-row">
+        <input type="date" class="exp-input" value="${t.dueDate||''}" onchange="updateField('${t.id}','dueDate',this.value||null)" title="Due">
+        <select class="exp-sel" onchange="updatePriority('${t.id}',parseInt(this.value))">
+          ${[1,2,3,4].map(p=>`<option value="${p}"${t.priority===p?' selected':''}>${PNAMES[p]}</option>`).join('')}
+        </select>
+        <select class="exp-sel" onchange="updateField('${t.id}','project',this.value||null)">
+          <option value="">No project</option>
+          ${(w.projects||[]).map(p=>`<option value="${p.id}"${t.project===p.id?' selected':''}>${esc(p.name)}</option>`).join('')}
+        </select>
+        <select class="exp-sel" onchange="updateField('${t.id}','milestoneId',this.value||null)">
+          <option value="">No milestone</option>
+          ${msOpts.map(m=>`<option value="${m.id}"${t.milestoneId===m.id?' selected':''}>${esc(m.name)}</option>`).join('')}
+        </select>
+        <select class="exp-sel" onchange="updateField('${t.id}','recur',this.value||null)" title="Repeat">
+          <option value="">No repeat</option>
+          <option value="daily"${t.recur==='daily'?' selected':''}>Daily</option>
+          <option value="weekly"${t.recur==='weekly'?' selected':''}>Weekly</option>
+          <option value="biweekly"${t.recur==='biweekly'?' selected':''}>Every 2 weeks</option>
+          <option value="monthly"${t.recur==='monthly'?' selected':''}>Monthly</option>
+        </select>
+      </div>
+    </div>`;
+  return div;
+}
+
+function renderAddSelects(w) {
+  const projSel = document.getElementById('add-proj-sel');
+  projSel.innerHTML = '<option value="">No project</option>';
+  (w.projects||[]).forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;projSel.appendChild(o);});
+  if (projFilter!=='all') projSel.value = projFilter;
+
+  const msSel = document.getElementById('add-ms-sel');
+  msSel.innerHTML = '<option value="">No milestone</option>';
+  const msOpts = [...(w.milestones||[]),...(w.projects||[]).flatMap(p=>(p.milestones||[]))];
+  msOpts.forEach(m=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.name;msSel.appendChild(o);});
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function wsTasks(wsId) { return S.tasks.filter(t=>t.workspace===wsId); }
+function byPri(a,b) { if(a.priority!==b.priority)return a.priority-b.priority; if((a.order||0)!==(b.order||0))return(a.order||0)-(b.order||0); return(a.created||0)-(b.created||0); }
+function dueCls(d){if(!d)return'';if(d<TODAY)return'overdue';if(d===TODAY)return'today';return'';}
+function fmtDate(d){if(!d)return'';const[,m,day]=d.split('-');return`${day}/${m}`;}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function el(tag,cls){const d=document.createElement(tag);d.className=cls;return d;}
+function mkBtn(cls,text){const b=el('button',cls);b.textContent=text;return b;}
+function secLabel(t){const d=el('div','sec-label');d.textContent=t;return d;}
+
+function endOf3Days(){const d=new Date();d.setDate(d.getDate()+2);return d.toISOString().slice(0,10);}
+function endOfWeek(){const d=new Date();const day=d.getDay();d.setDate(d.getDate()+(day===0?6:6-day));return d.toISOString().slice(0,10);}
+function matchTime(t){
+  if(timeFilter==='all') return true;
+  if(timeFilter==='overdue') return t.dueDate&&t.dueDate<TODAY;
+  if(timeFilter==='today') return t.dueDate===TODAY;
+  if(timeFilter==='3days') return t.dueDate&&t.dueDate>=TODAY&&t.dueDate<=endOf3Days();
+  if(timeFilter==='week') return t.dueDate&&t.dueDate>=TODAY&&t.dueDate<=endOfWeek();
+  return true;
+}
+
+// ── TASK OPS ──────────────────────────────────────────────────────────────────
+function nextRecurDate(fromDate, recur) {
+  const d = fromDate ? new Date(fromDate) : new Date();
+  if (recur === 'daily')     d.setDate(d.getDate() + 1);
+  else if (recur === 'weekly')    d.setDate(d.getDate() + 7);
+  else if (recur === 'biweekly')  d.setDate(d.getDate() + 14);
+  else if (recur === 'monthly')   d.setMonth(d.getMonth() + 1);
+  return d.toISOString().slice(0, 10);
+}
+async function spawnNextRecurrence(t) {
+  const next = {
+    ...t,
+    id: uid(),
+    done: false,
+    doneAt: null,
+    created: Date.now(),
+    dueDate: t.dueDate ? nextRecurDate(t.dueDate, t.recur) : nextRecurDate(null, t.recur),
+    order: t.order,
+  };
+  S.tasks.push(next);
+  await writeTaskFile(next);
+}
+async function toggleDone(id){
+  const t=S.tasks.find(x=>x.id===id);
+  if(!t)return;
+  t.done=!t.done;
+  t.doneAt=t.done?Date.now():null;
+  await persist(t);
+  if(t.done && t.recur) await spawnNextRecurrence(t);
+  render();
+}
+async function delTask(id){S.tasks=S.tasks.filter(x=>x.id!==id);if(expandId===id)expandId=null;await deleteTaskFile(id);flashSave();render();}
+function toggleExpand(id){expandId=expandId===id?null:id;renderMain();}
+function queueSaveNotes(id,v){clearTimeout(notesTimer[id]);notesTimer[id]=setTimeout(async()=>{const t=S.tasks.find(x=>x.id===id);if(t){t.notes=v;await persist(t);}},600);}
+async function updateField(id,field,val){const t=S.tasks.find(x=>x.id===id);if(!t)return;t[field]=val;await persist(t);render();}
+async function updatePriority(id,newP){const t=S.tasks.find(x=>x.id===id);if(!t)return;const maxO=Math.max(0,...wsTasks(t.workspace).filter(x=>x.priority===newP&&x.id!==id).map(x=>x.order||0));t.priority=newP;t.order=maxO+1;await persist(t);render();}
+async function completeUpNext(){const w=S.workspaces.find(x=>x.id===S.activeId);if(!w)return;const top=visibleTasks(w).filter(t=>!t.done).sort(byPri)[0];if(!top)return;top.done=true;top.doneAt=Date.now();await persist(top);if(top.recur)await spawnNextRecurrence(top);render();}
+async function addTask(){
+  const inp=document.getElementById('task-input');const title=inp.value.trim();if(!title||!S.activeId)return;
+  const p=parseInt(document.getElementById('add-pri').value);
+  const maxO=Math.max(0,...wsTasks(S.activeId).filter(t=>t.priority===p).map(t=>t.order||0));
+  const t={id:uid(),workspace:S.activeId,title,notes:'',priority:p,
+    dueDate:document.getElementById('add-due').value||null,
+    project:document.getElementById('add-proj-sel').value||null,
+    milestoneId:document.getElementById('add-ms-sel').value||null,
+    recur:null,order:maxO+1,done:false,created:Date.now(),doneAt:null};
+  S.tasks.push(t);inp.value='';document.getElementById('add-due').value='';
+  inp.focus();await persist(t);render();
+}
+function toggleShowDone(){showDone=!showDone;document.getElementById('done-toggle').className='icon-btn'+(showDone?' on':'');render();}
+
+// ── WORKSPACE OPS ─────────────────────────────────────────────────────────────
+function openWsModal(edit=false){
+  editWsId=edit?S.activeId:null;const w=edit?S.workspaces.find(x=>x.id===S.activeId):null;
+  wsColor=w?w.color:COLORS[0];
+  document.getElementById('ws-modal-title').textContent=edit?'Edit Workspace':'New Workspace';
+  document.getElementById('ws-name').value=w?w.name:'';
+  document.getElementById('ws-save-btn').textContent=edit?'Save':'Create';
+  document.getElementById('ws-del-btn').style.display=edit&&S.workspaces.length>1?'block':'none';
+  buildCpicker('ws-cpicker',wsColor,c=>wsColor=c);
+  document.getElementById('ws-overlay').className='overlay open';
+  setTimeout(()=>document.getElementById('ws-name').focus(),50);
+}
+async function saveWs(){
+  const name=document.getElementById('ws-name').value.trim();if(!name)return;
+  if(editWsId){const w=S.workspaces.find(x=>x.id===editWsId);w.name=name;w.color=wsColor;}
+  else{const w={id:uid(),name,color:wsColor,projects:[],milestones:[]};S.workspaces.push(w);S.activeId=w.id;}
+  closeOverlay('ws-overlay');await saveWsFile();render();
+}
+async function deleteWs(){
+  const w=S.workspaces.find(x=>x.id===editWsId);if(!confirm(`Delete "${w.name}" and all tasks?`))return;
+  const ids=wsTasks(editWsId).map(t=>t.id);S.tasks=S.tasks.filter(t=>t.workspace!==editWsId);S.workspaces=S.workspaces.filter(x=>x.id!==editWsId);
+  if(S.activeId===editWsId)S.activeId=S.workspaces[0]?.id||null;
+  closeOverlay('ws-overlay');await saveWsFile();await Promise.all(ids.map(deleteTaskFile));flashSave();render();
+}
+
+// ── PROJECT OPS ───────────────────────────────────────────────────────────────
+function openProjModal(id=null){
+  editProjId=id;const w=S.workspaces.find(x=>x.id===S.activeId);if(!w)return;
+  const p=id?(w.projects||[]).find(x=>x.id===id):null;
+  projColor=p?p.color:COLORS[Math.floor(Math.random()*COLORS.length)];
+  document.getElementById('proj-modal-title').textContent=id?'Edit Project':'New Project';
+  document.getElementById('proj-name').value=p?p.name:'';
+  document.getElementById('proj-save-btn').textContent=id?'Save':'Create';
+  document.getElementById('proj-del-btn').style.display=id?'block':'none';
+  buildCpicker('proj-cpicker',projColor,c=>projColor=c);
+  document.getElementById('proj-overlay').className='overlay open';
+  setTimeout(()=>document.getElementById('proj-name').focus(),50);
+}
+async function saveProj(){
+  const name=document.getElementById('proj-name').value.trim();if(!name)return;
+  const w=S.workspaces.find(x=>x.id===S.activeId);if(!w)return;if(!w.projects)w.projects=[];
+  if(editProjId){const p=w.projects.find(x=>x.id===editProjId);if(p){p.name=name;p.color=projColor;}}
+  else{w.projects.push({id:uid(),name,color:projColor,milestones:[]});}
+  closeOverlay('proj-overlay');await saveWsFile();render();if(sidebarOpen)renderSidebarPanel();
+}
+async function deleteProj(){
+  const w=S.workspaces.find(x=>x.id===S.activeId);if(!w)return;
+  const p=w.projects.find(x=>x.id===editProjId);if(!confirm(`Delete project "${p.name}"? Tasks will remain but lose project.`))return;
+  w.projects=w.projects.filter(x=>x.id!==editProjId);
+  const affected=S.tasks.filter(t=>t.project===editProjId);affected.forEach(t=>t.project=null);
+  if(projFilter===editProjId)projFilter='all';
+  closeOverlay('proj-overlay');await saveWsFile();await Promise.all(affected.map(persist));render();
+}
+
+// ── MILESTONE OPS ─────────────────────────────────────────────────────────────
+function getMilestoneTarget(){
+  // Milestones go under the active project if one is selected, otherwise workspace-level
+  const w=S.workspaces.find(x=>x.id===S.activeId);if(!w)return null;
+  if(projFilter!=='all'){const p=(w.projects||[]).find(x=>x.id===projFilter);if(p)return p;}
+  return w;
+}
+function openMsModal(id=null){
+  editMsId=id;const target=getMilestoneTarget();if(!target)return;
+  const ms=id?(target.milestones||[]).find(x=>x.id===id):null;
+  msColor=ms?ms.color:COLORS[5];
+  document.getElementById('ms-modal-title').textContent=id?'Edit Milestone':'New Milestone';
+  document.getElementById('ms-name').value=ms?ms.name:'';
+  document.getElementById('ms-save-btn').textContent=id?'Save':'Create';
+  document.getElementById('ms-del-btn').style.display=id?'block':'none';
+  buildCpicker('ms-cpicker',msColor,c=>msColor=c);
+  document.getElementById('ms-overlay').className='overlay open';
+  setTimeout(()=>document.getElementById('ms-name').focus(),50);
+}
+async function saveMs(){
+  const name=document.getElementById('ms-name').value.trim();if(!name)return;
+  const target=getMilestoneTarget();if(!target)return;if(!target.milestones)target.milestones=[];
+  if(editMsId){const ms=target.milestones.find(x=>x.id===editMsId);if(ms){ms.name=name;ms.color=msColor;}}
+  else target.milestones.push({id:uid(),name,color:msColor});
+  closeOverlay('ms-overlay');await saveWsFile();render();
+}
+async function deleteMs(){
+  const target=getMilestoneTarget();if(!target)return;
+  const ms=target.milestones.find(x=>x.id===editMsId);if(!confirm(`Delete milestone "${ms.name}"?`))return;
+  target.milestones=target.milestones.filter(x=>x.id!==editMsId);
+  const affected=S.tasks.filter(t=>t.milestoneId===editMsId);affected.forEach(t=>t.milestoneId=null);
+  if(msFilter===editMsId)msFilter='all';
+  closeOverlay('ms-overlay');await saveWsFile();await Promise.all(affected.map(persist));render();
+}
+
+// ── MODALS ────────────────────────────────────────────────────────────────────
+function overlayClick(e,id){if(e.target===document.getElementById(id))closeOverlay(id);}
+function closeOverlay(id){document.getElementById(id).className='overlay';}
+function buildCpicker(id,current,onPick){
+  const container=document.getElementById(id);container.innerHTML='';
+  COLORS.forEach(c=>{
+    const s=el('div','cswatch'+(c===current?' sel':''));s.style.background=c;
+    s.onclick=()=>{onPick(c);container.querySelectorAll('.cswatch').forEach(x=>x.classList.remove('sel'));s.classList.add('sel');};
+    container.appendChild(s);
+  });
+}
+
+// ── KEYBOARD ──────────────────────────────────────────────────────────────────
+document.getElementById('search-input').addEventListener('input',e=>{searchQ=e.target.value;renderMain();});
+document.addEventListener('keydown',e=>{
+  const tag=document.activeElement?.tagName;
+  const inInput=tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT';
+  if(inInput){
+    if(e.key==='Enter'&&document.activeElement.id==='task-input')addTask();
+    if(e.key==='Enter'&&document.activeElement.id==='ws-name')saveWs();
+    if(e.key==='Enter'&&document.activeElement.id==='proj-name')saveProj();
+    if(e.key==='Enter'&&document.activeElement.id==='ms-name')saveMs();
+    if(e.key==='Escape'){document.activeElement.blur();searchQ='';document.getElementById('search-input').value='';expandId=null;renderMain();}
+    return;
+  }
+  if(e.key==='n'||e.key==='N'){document.getElementById('task-input').focus();return;}
+  if(e.key==='/'){e.preventDefault();document.getElementById('search-input').focus();return;}
+  if(e.key==='w'||e.key==='W'){toggleSidebar();return;}
+  if(e.key==='Escape'){if(sidebarOpen)closeSidebar();else{closeOverlay('ws-overlay');closeOverlay('proj-overlay');closeOverlay('ms-overlay');expandId=null;renderMain();}}
+  const n=parseInt(e.key);
+  if(n>=1&&n<=9&&n<=S.workspaces.length){S.activeId=S.workspaces[n-1].id;projFilter='all';msFilter='all';if(sidebarOpen)renderSidebarPanel();render();}
+});
+document.getElementById('task-area').addEventListener('click',e=>{
+  if(!e.target.closest('.task-item')&&expandId){expandId=null;renderMain();}
+});
+
+// ── SEED DATA ─────────────────────────────────────────────────────────────────
+const SEED_WORKSPACES = [
+  {id:'ws-gr',name:'GameReady',color:'#3b82f6',milestones:[],projects:[
+    {id:'proj-gr-studio',name:'Studio Ops',color:'#3b82f6',milestones:[]},
+    {id:'proj-gr-presence',name:'GR Presence',color:'#14b8a6',milestones:[]},
+  ]},
+  {id:'ws-games',name:'Games – Personal',color:'#7c6dfa',milestones:[],projects:[
+    {id:'proj-fps',name:'FPS Plugin',color:'#a855f7',milestones:[]},
+    {id:'proj-gamedev',name:'Game Dev',color:'#7c6dfa',milestones:[]},
+  ]},
+  {id:'ws-content',name:'Content',color:'#f97316',milestones:[],projects:[]},
+  {id:'ws-admin',name:'Admin',color:'#64748b',milestones:[],projects:[]},
+  {id:'ws-books',name:'Books',color:'#22c55e',milestones:[],projects:[]},
+];
+const SEED_TASKS = [];
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+(async () => {
+  if (!window.showDirectoryPicker) {
+    document.getElementById('setup-note').textContent = '⚠️ Requires Chrome or Edge.';
+    document.getElementById('setup').className = 'show'; return;
+  }
+  const state = await tryRestoreDir();
+  if (state === 'granted') {
+    await initFromDir();
+  } else if (state === 'prompt') {
+    document.getElementById('setup-msg').textContent = 'Click to reconnect to your tasks folder.';
+    document.getElementById('setup-btn').textContent = 'Resume session';
+    document.getElementById('setup-btn').onclick = resumeDir;
+    document.getElementById('setup').className = 'show';
+  } else {
+    document.getElementById('setup').className = 'show';
+  }
+})();
+</script>
+</body>
+</html>
