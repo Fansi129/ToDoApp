@@ -308,6 +308,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
         <select id="add-proj-sel" class="fsel"></select>
         <div class="fsep"></div>
         <select id="add-ms-sel" class="fsel"></select>
+        <div class="fsep"></div>
+        <select id="add-recur" class="fsel" title="Repeat">
+          <option value="">No repeat</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="biweekly">Every 2w</option>
+          <option value="monthly">Monthly</option>
+        </select>
         <button id="add-btn" onclick="addTask()">Add</button>
       </div>
     </div>
@@ -868,8 +876,8 @@ async function addTask(){
     dueDate:document.getElementById('add-due').value||null,
     project:document.getElementById('add-proj-sel').value||null,
     milestoneId:document.getElementById('add-ms-sel').value||null,
-    recur:null,order:maxO+1,done:false,created:Date.now(),doneAt:null};
-  S.tasks.push(t);inp.value='';document.getElementById('add-due').value='';
+    recur:document.getElementById('add-recur').value||null,order:maxO+1,done:false,created:Date.now(),doneAt:null};
+  S.tasks.push(t);inp.value='';document.getElementById('add-due').value='';document.getElementById('add-recur').value='';
   inp.focus();await persist(t);render();
 }
 function toggleShowDone(){showDone=!showDone;document.getElementById('done-toggle').className='icon-btn'+(showDone?' on':'');render();}
