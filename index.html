@@ -379,6 +379,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
   </div>
 </div>
 
+<!-- Snooze Warning Modal -->
+<div id="snooze-overlay" class="overlay" onclick="overlayClick(event,'snooze-overlay')">
+  <div class="modal">
+    <h3>⚠️ Snoozed 3 times</h3>
+    <p id="snooze-warn-title" style="font-size:13px;color:var(--text2);margin:0;"></p>
+    <p style="font-size:12px;color:var(--text3);margin:0;">This task keeps getting pushed. What do you actually want to do with it?</p>
+    <div class="mactions" style="flex-direction:column;gap:6px;">
+      <button class="btn-pri" onclick="snoozeWarnReschedule()" style="width:100%">📅 Set a real date</button>
+      <button class="btn-sec" onclick="snoozeWarnPriority()" style="width:100%">⬇ Drop priority</button>
+      <button class="btn-del" onclick="snoozeWarnDelete()" style="width:100%">🗑 Delete it</button>
+      <button class="btn-sec" onclick="snoozeWarnAnyway()" style="width:100%;opacity:.6">Snooze anyway</button>
+    </div>
+  </div>
+</div>
+
 <!-- Milestone Modal -->
 <div id="ms-overlay" class="overlay" onclick="overlayClick(event,'ms-overlay')">
   <div class="modal">
@@ -893,19 +908,52 @@ async function toggleDone(id){
   if(t.done && t.recur) await spawnNextRecurrence(t);
   render();
 }
-async function snoozeTask(id, to) {
-  const t = S.tasks.find(x=>x.id===id); if(!t) return;
+let snoozeWarnId = null, snoozeWarnTo = null;
+function applySnooze(t, to) {
   const base = (t.dueDate && t.dueDate >= TODAY) ? new Date(t.dueDate) : new Date();
   if (to === 'tomorrow') {
     base.setDate(base.getDate() + 1);
-    t.dueDate = base.toISOString().slice(0,10);
   } else {
     const day = base.getDay();
-    const toMon = day === 0 ? 1 : (day === 1 ? 7 : 8 - day);
-    base.setDate(base.getDate() + toMon);
-    t.dueDate = base.toISOString().slice(0,10);
+    base.setDate(base.getDate() + (day === 0 ? 1 : day === 1 ? 7 : 8 - day));
   }
+  t.dueDate = base.toISOString().slice(0,10);
+}
+async function snoozeTask(id, to) {
+  const t = S.tasks.find(x=>x.id===id); if(!t) return;
+  t.snoozeCount = (t.snoozeCount || 0) + 1;
+  if (t.snoozeCount >= 3) {
+    snoozeWarnId = id; snoozeWarnTo = to;
+    document.getElementById('snooze-warn-title').textContent = t.title;
+    document.getElementById('snooze-overlay').classList.add('open');
+    return;
+  }
+  applySnooze(t, to);
   await persist(t); render();
+}
+async function snoozeWarnAnyway() {
+  closeOverlay('snooze-overlay');
+  const t = S.tasks.find(x=>x.id===snoozeWarnId); if(!t) return;
+  applySnooze(t, snoozeWarnTo);
+  await persist(t); render();
+}
+async function snoozeWarnDelete() {
+  closeOverlay('snooze-overlay');
+  await delTask(snoozeWarnId);
+}
+async function snoozeWarnPriority() {
+  closeOverlay('snooze-overlay');
+  const t = S.tasks.find(x=>x.id===snoozeWarnId); if(!t) return;
+  if (t.priority < 4) { await updatePriority(t.id, t.priority + 1); }
+}
+function snoozeWarnReschedule() {
+  closeOverlay('snooze-overlay');
+  expandId = snoozeWarnId;
+  renderMain();
+  setTimeout(() => {
+    const el = document.querySelector(`.task-expand.open input[type=date]`);
+    if (el) el.focus();
+  }, 50);
 }
 async function delTask(id){S.tasks=S.tasks.filter(x=>x.id!==id);if(expandId===id)expandId=null;await deleteTaskFile(id);flashSave();render();}
 function toggleExpand(id){expandId=expandId===id?null:id;renderMain();}
