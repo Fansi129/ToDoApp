@@ -163,7 +163,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 
 /* ── ADD BAR ────────────────────────────────────────────────────────────────── */
 #add-bar{padding:8px 20px 13px;border-top:1px solid var(--border);background:var(--surface);}
-#add-form{display:flex;gap:5px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:6px 9px;align-items:center;transition:border-color .15s;flex-wrap:wrap;}
+#add-form{display:flex;flex-direction:column;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);transition:border-color .15s;}
+#add-row1{display:flex;gap:5px;padding:6px 9px;align-items:center;flex-wrap:wrap;}
+#quick-set{display:none;gap:6px;padding:5px 9px 7px;align-items:center;border-top:1px solid var(--border);}
+#quick-set.show{display:flex;}
+.qs-lbl{font-size:11px;color:var(--text3);margin-right:2px;}
+.qs-btn{background:var(--surface3);border:1px solid var(--border);color:var(--text2);padding:2px 9px;border-radius:4px;font-size:12px;cursor:pointer;transition:background .1s,color .1s;}
+.qs-btn:hover{border-color:var(--accent);color:var(--accent);}
+.qs-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.qs-sep{width:1px;height:14px;background:var(--border);margin:0 2px;}
+.qs-hint{font-size:11px;color:var(--text3);margin-left:auto;}
 #add-form:focus-within{border-color:var(--accent);}
 #task-input{flex:1;min-width:120px;background:none;border:none;outline:none;color:var(--text);font-size:14px;}
 #task-input::placeholder{color:var(--text3);}
@@ -294,29 +303,43 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 
     <div id="add-bar">
       <div id="add-form">
-        <input id="task-input" type="text" placeholder="New task… (N)" autocomplete="off">
-        <div class="fsep"></div>
-        <input id="add-due" type="date" title="Due date">
-        <div class="fsep"></div>
-        <select id="add-pri" class="fsel">
-          <option value="1">P1</option>
-          <option value="2">P2</option>
-          <option value="3" selected>P3</option>
-          <option value="4">P4</option>
-        </select>
-        <div class="fsep"></div>
-        <select id="add-proj-sel" class="fsel"></select>
-        <div class="fsep"></div>
-        <select id="add-ms-sel" class="fsel"></select>
-        <div class="fsep"></div>
-        <select id="add-recur" class="fsel" title="Repeat">
-          <option value="">No repeat</option>
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="biweekly">Every 2w</option>
-          <option value="monthly">Monthly</option>
-        </select>
-        <button id="add-btn" onclick="addTask()">Add</button>
+        <div id="add-row1">
+          <input id="task-input" type="text" placeholder="New task… (N)" autocomplete="off">
+          <div class="fsep"></div>
+          <input id="add-due" type="date" title="Due date">
+          <div class="fsep"></div>
+          <select id="add-pri" class="fsel">
+            <option value="1">P1</option>
+            <option value="2">P2</option>
+            <option value="3" selected>P3</option>
+            <option value="4">P4</option>
+          </select>
+          <div class="fsep"></div>
+          <select id="add-proj-sel" class="fsel"></select>
+          <div class="fsep"></div>
+          <select id="add-ms-sel" class="fsel"></select>
+          <div class="fsep"></div>
+          <select id="add-recur" class="fsel" title="Repeat">
+            <option value="">No repeat</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="biweekly">Every 2w</option>
+            <option value="monthly">Monthly</option>
+          </select>
+          <button id="add-btn" onclick="addTask()">Add</button>
+        </div>
+        <div id="quick-set">
+          <span class="qs-lbl">Priority</span>
+          <button class="qs-btn" data-p="1" onclick="qsSetPri(1)">1 Critical</button>
+          <button class="qs-btn" data-p="2" onclick="qsSetPri(2)">2 High</button>
+          <button class="qs-btn active" data-p="3" onclick="qsSetPri(3)">3 Normal</button>
+          <button class="qs-btn" data-p="4" onclick="qsSetPri(4)">4 Low</button>
+          <div class="qs-sep"></div>
+          <span class="qs-lbl">Due</span>
+          <button class="qs-btn" id="qs-today" onclick="qsSetDate('today')">T Today</button>
+          <button class="qs-btn" id="qs-week" onclick="qsSetDate('week')">W Week</button>
+          <span class="qs-hint">↵ add &nbsp; Esc cancel</span>
+        </div>
       </div>
     </div>
   </div>
@@ -868,8 +891,30 @@ function queueSaveNotes(id,v){clearTimeout(notesTimer[id]);notesTimer[id]=setTim
 async function updateField(id,field,val){const t=S.tasks.find(x=>x.id===id);if(!t)return;t[field]=val;await persist(t);render();}
 async function updatePriority(id,newP){const t=S.tasks.find(x=>x.id===id);if(!t)return;const maxO=Math.max(0,...wsTasks(t.workspace).filter(x=>x.priority===newP&&x.id!==id).map(x=>x.order||0));t.priority=newP;t.order=maxO+1;await persist(t);render();}
 async function completeUpNext(){const w=S.workspaces.find(x=>x.id===S.activeId);if(!w)return;const top=visibleTasks(w).filter(t=>!t.done).sort(byPri)[0];if(!top)return;top.done=true;top.doneAt=Date.now();await persist(top);if(top.recur)await spawnNextRecurrence(top);render();}
+let quickSetOpen = false;
+function qsOpen() {
+  quickSetOpen = true;
+  document.getElementById('quick-set').className = 'show';
+}
+function qsClose() {
+  quickSetOpen = false;
+  document.getElementById('quick-set').className = '';
+}
+function qsSetPri(p) {
+  document.getElementById('add-pri').value = p;
+  document.querySelectorAll('.qs-btn[data-p]').forEach(b => b.classList.toggle('active', parseInt(b.dataset.p)===p));
+}
+function qsSetDate(which) {
+  const d = which === 'today' ? TODAY : endOfWeek();
+  document.getElementById('add-due').value = d;
+  document.getElementById('qs-today').classList.toggle('active', which==='today');
+  document.getElementById('qs-week').classList.toggle('active', which==='week');
+}
 async function addTask(){
   const inp=document.getElementById('task-input');const title=inp.value.trim();if(!title||!S.activeId)return;
+  const hasDue = document.getElementById('add-due').value;
+  if(!hasDue && !quickSetOpen){ qsOpen(); return; }
+  qsClose();
   const p=parseInt(document.getElementById('add-pri').value);
   const maxO=Math.max(0,...wsTasks(S.activeId).filter(t=>t.priority===p).map(t=>t.order||0));
   const t={id:uid(),workspace:S.activeId,title,notes:'',priority:p,
@@ -993,7 +1038,18 @@ document.addEventListener('keydown',e=>{
     if(e.key==='Enter'&&document.activeElement.id==='ws-name')saveWs();
     if(e.key==='Enter'&&document.activeElement.id==='proj-name')saveProj();
     if(e.key==='Enter'&&document.activeElement.id==='ms-name')saveMs();
-    if(e.key==='Escape'){document.activeElement.blur();searchQ='';document.getElementById('search-input').value='';expandId=null;renderMain();}
+    if(e.key==='Escape'){
+      if(quickSetOpen){qsClose();return;}
+      document.activeElement.blur();searchQ='';document.getElementById('search-input').value='';expandId=null;renderMain();
+    }
+    if(quickSetOpen){
+      if(e.key==='1')qsSetPri(1);
+      if(e.key==='2')qsSetPri(2);
+      if(e.key==='3')qsSetPri(3);
+      if(e.key==='4')qsSetPri(4);
+      if(e.key==='t'||e.key==='T'){e.preventDefault();qsSetDate('today');}
+      if(e.key==='w'||e.key==='W'){e.preventDefault();qsSetDate('week');}
+    }
     return;
   }
   if(e.key==='n'||e.key==='N'){document.getElementById('task-input').focus();return;}
