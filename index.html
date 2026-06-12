@@ -152,6 +152,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .task-del{opacity:0;background:none;border:none;color:var(--text3);cursor:pointer;padding:2px 4px;border-radius:4px;font-size:16px;line-height:1;transition:color .1s;flex-shrink:0;}
 .task-item:hover .task-del{opacity:1;}
 .task-del:hover{color:var(--p1);}
+.snooze-btns{display:none;gap:3px;flex-shrink:0;}
+.task-item:hover .snooze-btns{display:flex;}
+.snooze-btn{background:none;border:1px solid var(--border);color:var(--text3);font-size:10px;padding:1px 6px;border-radius:4px;cursor:pointer;transition:border-color .1s,color .1s;}
+.snooze-btn:hover{border-color:var(--accent);color:var(--accent);}
 .task-expand{display:none;padding:0 9px 9px 40px;flex-direction:column;gap:6px;}
 .task-expand.open{display:flex;}
 .notes-ta{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font-size:13px;font-family:inherit;resize:vertical;min-height:52px;outline:none;width:100%;transition:border-color .1s;}
@@ -791,6 +795,10 @@ function taskEl(t, w) {
         ${t.dueDate?`<span class="dbadge ${dueCls(t.dueDate)}">${fmtDate(t.dueDate)}</span>`:''}
         <span class="pbadge p${t.priority}">P${t.priority}</span>
       </span>
+      <span class="snooze-btns">
+        <button class="snooze-btn" onclick="snoozeTask('${t.id}','tomorrow')" title="Move to tomorrow">+1d</button>
+        <button class="snooze-btn" onclick="snoozeTask('${t.id}','monday')" title="Move to Monday">Mon</button>
+      </span>
       <button class="task-del" onclick="delTask('${t.id}')">×</button>
     </div>
     <div class="task-expand ${open?'open':''}">
@@ -884,6 +892,20 @@ async function toggleDone(id){
   await persist(t);
   if(t.done && t.recur) await spawnNextRecurrence(t);
   render();
+}
+async function snoozeTask(id, to) {
+  const t = S.tasks.find(x=>x.id===id); if(!t) return;
+  const base = (t.dueDate && t.dueDate >= TODAY) ? new Date(t.dueDate) : new Date();
+  if (to === 'tomorrow') {
+    base.setDate(base.getDate() + 1);
+    t.dueDate = base.toISOString().slice(0,10);
+  } else {
+    const day = base.getDay();
+    const toMon = day === 0 ? 1 : (day === 1 ? 7 : 8 - day);
+    base.setDate(base.getDate() + toMon);
+    t.dueDate = base.toISOString().slice(0,10);
+  }
+  await persist(t); render();
 }
 async function delTask(id){S.tasks=S.tasks.filter(x=>x.id!==id);if(expandId===id)expandId=null;await deleteTaskFile(id);flashSave();render();}
 function toggleExpand(id){expandId=expandId===id?null:id;renderMain();}
