@@ -164,6 +164,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .exp-input,.exp-sel{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:4px 7px;font-size:12px;outline:none;transition:border-color .1s;}
 .exp-input:focus,.exp-sel:focus{border-color:var(--accent);}
 .exp-sel{cursor:pointer;}
+.subtask-section{display:flex;flex-direction:column;gap:3px;margin-top:2px;}
+.subtask-row{display:flex;align-items:center;gap:6px;padding:1px 0;}
+.sub-check{width:14px;height:14px;border-radius:3px;border:2px solid var(--border);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:border-color .1s,background .1s;}
+.sub-check:hover{border-color:var(--done-col);}
+.sub-check.done{background:var(--done-col);border-color:var(--done-col);}
+.sub-title{flex:1;font-size:12px;color:var(--text2);}
+.sub-title.done{text-decoration:line-through;opacity:.5;}
+.sub-del{opacity:0;background:none;border:none;color:var(--text3);cursor:pointer;padding:0 3px;font-size:14px;line-height:1;transition:color .1s;}
+.subtask-row:hover .sub-del{opacity:1;}
+.sub-del:hover{color:var(--p1);}
+.sub-add-row{display:flex;gap:5px;margin-top:2px;}
+.sub-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:3px 7px;font-size:12px;outline:none;transition:border-color .1s;}
+.sub-input:focus{border-color:var(--accent);}
+.sub-add-btn{background:none;border:1px solid var(--border);color:var(--text2);padding:2px 9px;border-radius:4px;font-size:12px;cursor:pointer;transition:border-color .1s,color .1s;}
+.sub-add-btn:hover{border-color:var(--accent);color:var(--accent);}
+.sub-progress{font-size:10px;padding:2px 5px;border-radius:4px;background:var(--surface3);color:var(--text2);}
 
 /* ── ADD BAR ────────────────────────────────────────────────────────────────── */
 #add-bar{padding:8px 20px 13px;border-top:1px solid var(--border);background:var(--surface);}
@@ -417,6 +433,7 @@ const TODAY = new Date().toISOString().slice(0,10);
 // ── STATE ────────────────────────────────────────────────────────────────────
 let rootDir = null, tasksDir = null;
 let S = { workspaces: [], tasks: [], activeId: null };
+let taskFileMap = {}; // id -> current filename on disk
 
 let sidebarOpen = false;
 let timeFilter = 'today';
@@ -489,23 +506,43 @@ function migrateWs(w) {
   return { ...w, projects: (w.projects || []).map(p => ({ ...p, milestones: p.milestones || [] })) };
 }
 
+function taskFilename(t) {
+  return `${t.dueDate || 'nodate'}_${t.id}.json`;
+}
+
 async function loadAllTasks() {
   const tasks = [];
+  taskFileMap = {};
   for await (const [name, handle] of tasksDir) {
     if (handle.kind === 'file' && name.endsWith('.json')) {
-      try { const f = await handle.getFile(); tasks.push(JSON.parse(await f.text())); } catch {}
+      try {
+        const f = await handle.getFile();
+        const t = JSON.parse(await f.text());
+        tasks.push(t);
+        taskFileMap[t.id] = name;
+      } catch {}
     }
   }
+  // Migrate files whose name doesn't match new scheme
+  const toMigrate = tasks.filter(t => taskFileMap[t.id] !== taskFilename(t));
+  await Promise.all(toMigrate.map(t => writeTaskFile(t)));
   return tasks;
 }
 
 async function writeTaskFile(t) {
-  const fh = await tasksDir.getFileHandle(`${t.id}.json`, { create: true });
+  const newName = taskFilename(t);
+  const oldName = taskFileMap[t.id];
+  if (oldName && oldName !== newName) {
+    try { await tasksDir.removeEntry(oldName); } catch {}
+  }
+  const fh = await tasksDir.getFileHandle(newName, { create: true });
   const w = await fh.createWritable(); await w.write(JSON.stringify(t, null, 2)); await w.close();
+  taskFileMap[t.id] = newName;
 }
 
 async function deleteTaskFile(id) {
-  try { await tasksDir.removeEntry(`${id}.json`); } catch {}
+  const name = taskFileMap[id];
+  if (name) { try { await tasksDir.removeEntry(name); } catch {} delete taskFileMap[id]; }
 }
 
 async function readJSON(name) {
@@ -772,6 +809,8 @@ function taskEl(t, w) {
   const allMs = (w.projects||[]).flatMap(p=>(p.milestones||[]))||[];
   const wsMs = w.milestones||[];
   const ms = [...wsMs,...allMs].find(m=>m.id===t.milestoneId);
+  const subDone = (t.subtasks||[]).filter(s=>s.done).length;
+  const subTotal = (t.subtasks||[]).length;
   const open = expandId===t.id;
   const div = el('div', 'task-item'+(t.done?' done':''));
   div.dataset.id = t.id;
@@ -805,6 +844,7 @@ function taskEl(t, w) {
       <span class="badges">
         ${t.notes?'<span class="notes-dot"></span>':''}
         ${t.recur?'<span class="recur-icon" title="Repeating">↻</span>':''}
+        ${subTotal>0?`<span class="sub-progress">${subDone}/${subTotal}</span>`:''}
         ${proj?`<span class="tagbadge" style="background:${proj.color}">${esc(proj.name)}</span>`:''}
         ${ms?`<span class="tagbadge" style="background:${ms.color||'#666'}">${esc(ms.name)}</span>`:''}
         ${t.dueDate?`<span class="dbadge ${dueCls(t.dueDate)}">${fmtDate(t.dueDate)}</span>`:''}
@@ -838,6 +878,20 @@ function taskEl(t, w) {
           <option value="biweekly"${t.recur==='biweekly'?' selected':''}>Every 2 weeks</option>
           <option value="monthly"${t.recur==='monthly'?' selected':''}>Monthly</option>
         </select>
+      </div>
+      <div class="subtask-section">
+        ${(t.subtasks||[]).map(s=>`
+        <div class="subtask-row">
+          <div class="sub-check${s.done?' done':''}" onclick="toggleSubtask('${t.id}','${s.id}')">
+            ${s.done?'<svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.5"><polyline points="1.5 6 4.5 9 10.5 3"/></svg>':''}
+          </div>
+          <span class="sub-title${s.done?' done':''}">${esc(s.title)}</span>
+          <button class="sub-del" onclick="deleteSubtask('${t.id}','${s.id}')">×</button>
+        </div>`).join('')}
+        <div class="sub-add-row">
+          <input class="sub-input" id="sub-inp-${t.id}" placeholder="Add subtask…" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubtask('${t.id}');}">
+          <button class="sub-add-btn" onclick="addSubtask('${t.id}')">+</button>
+        </div>
       </div>
     </div>`;
   return div;
@@ -996,6 +1050,28 @@ async function addTask(){
   inp.focus();await persist(t);render();
 }
 function toggleShowDone(){showDone=!showDone;document.getElementById('done-toggle').className='icon-btn'+(showDone?' on':'');render();}
+
+// ── SUBTASK OPS ───────────────────────────────────────────────────────────────
+async function toggleSubtask(taskId, subtaskId) {
+  const t = S.tasks.find(x=>x.id===taskId); if(!t) return;
+  const s = (t.subtasks||[]).find(x=>x.id===subtaskId); if(!s) return;
+  s.done = !s.done;
+  await persist(t); renderMain();
+}
+async function addSubtask(taskId) {
+  const inp = document.getElementById(`sub-inp-${taskId}`); if(!inp) return;
+  const title = inp.value.trim(); if(!title) return;
+  const t = S.tasks.find(x=>x.id===taskId); if(!t) return;
+  if(!t.subtasks) t.subtasks = [];
+  t.subtasks.push({id:uid(), title, done:false});
+  inp.value = '';
+  await persist(t); renderMain();
+}
+async function deleteSubtask(taskId, subtaskId) {
+  const t = S.tasks.find(x=>x.id===taskId); if(!t) return;
+  t.subtasks = (t.subtasks||[]).filter(s=>s.id!==subtaskId);
+  await persist(t); renderMain();
+}
 
 // ── WORKSPACE OPS ─────────────────────────────────────────────────────────────
 function openWsModal(edit=false){
