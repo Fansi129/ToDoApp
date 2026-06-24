@@ -687,10 +687,12 @@ function renderFilterBar(w) {
   const todayDoneCount = todayTasks.filter(t=>t.done).length;
   const todayTotal = todayTasks.length;
 
+  const TOMORROW = (()=>{const d=new Date();d.setDate(d.getDate()+1);return d.toISOString().slice(0,10);})();
   const timeOpts = [
     { key:'all', label:'All', count: null },
     { key:'overdue', label:'Overdue', count: wt.filter(t=>!t.done&&t.dueDate&&t.dueDate<TODAY).length, warn:true },
     { key:'today', label:'Today', count: todayTotal, done: todayDoneCount },
+    { key:'tomorrow', label:'Tomorrow', count: wt.filter(t=>!t.done&&t.dueDate===TOMORROW).length },
     { key:'3days', label:'3 Days', count: wt.filter(t=>!t.done&&t.dueDate&&t.dueDate>=TODAY&&t.dueDate<=E3).length },
     { key:'week', label:'Week', count: wt.filter(t=>!t.done&&t.dueDate&&t.dueDate>=TODAY&&t.dueDate<=EW).length },
   ];
@@ -934,10 +936,12 @@ function secLabel(t){const d=el('div','sec-label');d.textContent=t;return d;}
 
 function endOf3Days(){const d=new Date();d.setDate(d.getDate()+2);return d.toISOString().slice(0,10);}
 function endOfWeek(){const d=new Date();const day=d.getDay();d.setDate(d.getDate()+(day===0?6:6-day));return d.toISOString().slice(0,10);}
+function tomorrow(){const d=new Date();d.setDate(d.getDate()+1);return d.toISOString().slice(0,10);}
 function matchTime(t){
   if(timeFilter==='all') return true;
   if(timeFilter==='overdue') return t.dueDate&&t.dueDate<TODAY;
   if(timeFilter==='today') return t.dueDate===TODAY;
+  if(timeFilter==='tomorrow') return t.dueDate===tomorrow();
   if(timeFilter==='3days') return t.dueDate&&t.dueDate>=TODAY&&t.dueDate<=endOf3Days();
   if(timeFilter==='week') return t.dueDate&&t.dueDate>=TODAY&&t.dueDate<=endOfWeek();
   return true;
