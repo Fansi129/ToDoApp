@@ -185,14 +185,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 #add-bar{padding:8px 20px 13px;border-top:1px solid var(--border);background:var(--surface);}
 #add-form{display:flex;flex-direction:column;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);transition:border-color .15s;}
 #add-row1{display:flex;gap:5px;padding:6px 9px;align-items:center;flex-wrap:wrap;}
-#quick-set{display:none;gap:6px;padding:5px 9px 7px;align-items:center;border-top:1px solid var(--border);}
+#quick-set{display:none;gap:6px;padding:5px 9px 7px;align-items:center;border-top:1px solid var(--border);flex-wrap:wrap;}
 #quick-set.show{display:flex;}
+#add-details{display:none;padding:6px 9px 8px;border-top:1px solid var(--border);}
+#add-details.show{display:block;}
+#add-notes-input{background:none;border:none;outline:none;color:var(--text);font-size:13px;resize:none;width:100%;font-family:inherit;min-height:52px;max-height:140px;line-height:1.5;}
+#add-notes-input::placeholder{color:var(--text3);}
 .qs-lbl{font-size:11px;color:var(--text3);margin-right:2px;}
 .qs-btn{background:var(--surface3);border:1px solid var(--border);color:var(--text2);padding:2px 9px;border-radius:4px;font-size:12px;cursor:pointer;transition:background .1s,color .1s;}
 .qs-btn:hover{border-color:var(--accent);color:var(--accent);}
 .qs-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .qs-sep{width:1px;height:14px;background:var(--border);margin:0 2px;}
 .qs-hint{font-size:11px;color:var(--text3);margin-left:auto;}
+#details-toggle{background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;padding:0 4px;line-height:1;flex-shrink:0;transition:color .1s;}
+#details-toggle:hover,#details-toggle.open{color:var(--accent);}
 #add-form:focus-within{border-color:var(--accent);}
 #task-input{flex:1;min-width:120px;background:none;border:none;outline:none;color:var(--text);font-size:14px;}
 #task-input::placeholder{color:var(--text3);}
@@ -346,7 +352,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
             <option value="biweekly">Every 2w</option>
             <option value="monthly">Monthly</option>
           </select>
+          <button id="details-toggle" title="Add notes (Tab)" onclick="toggleDetails()">≡</button>
           <button id="add-btn" onclick="addTask()">Add</button>
+        </div>
+        <div id="add-details">
+          <textarea id="add-notes-input" placeholder="Notes…" rows="2"></textarea>
         </div>
         <div id="quick-set">
           <span class="qs-lbl">Priority</span>
@@ -357,6 +367,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
           <div class="qs-sep"></div>
           <span class="qs-lbl">Due</span>
           <button class="qs-btn" id="qs-today" onclick="qsSetDate('today')">T Today</button>
+          <button class="qs-btn" id="qs-tmrw" onclick="qsSetDate('tomorrow')">2 Tomorrow</button>
+          <button class="qs-btn" id="qs-3d" onclick="qsSetDate('3days')">3 3 Days</button>
           <button class="qs-btn" id="qs-week" onclick="qsSetDate('week')">W Week</button>
           <span class="qs-hint">↵ add &nbsp; Esc cancel</span>
         </div>
@@ -1016,6 +1028,14 @@ async function updateField(id,field,val){const t=S.tasks.find(x=>x.id===id);if(!
 async function updatePriority(id,newP){const t=S.tasks.find(x=>x.id===id);if(!t)return;const maxO=Math.max(0,...wsTasks(t.workspace).filter(x=>x.priority===newP&&x.id!==id).map(x=>x.order||0));t.priority=newP;t.order=maxO+1;await persist(t);render();}
 async function completeUpNext(){const w=S.workspaces.find(x=>x.id===S.activeId);if(!w)return;const top=visibleTasks(w).filter(t=>!t.done).sort(byPri)[0];if(!top)return;top.done=true;top.doneAt=Date.now();await persist(top);if(top.recur)await spawnNextRecurrence(top);render();}
 let quickSetOpen = false;
+let detailsOpen = false;
+function toggleDetails() {
+  detailsOpen = !detailsOpen;
+  document.getElementById('add-details').className = detailsOpen ? 'show' : '';
+  document.getElementById('details-toggle').className = detailsOpen ? 'open' : '';
+  if (detailsOpen) document.getElementById('add-notes-input').focus();
+  else document.getElementById('task-input').focus();
+}
 function qsOpen() {
   quickSetOpen = true;
   document.getElementById('quick-set').className = 'show';
@@ -1029,10 +1049,18 @@ function qsSetPri(p) {
   document.querySelectorAll('.qs-btn[data-p]').forEach(b => b.classList.toggle('active', parseInt(b.dataset.p)===p));
 }
 function qsSetDate(which) {
-  const d = which === 'today' ? TODAY : endOfWeek();
+  let d;
+  if (which === 'today') d = TODAY;
+  else if (which === 'tomorrow') { const t=new Date(); t.setDate(t.getDate()+1); d=t.toISOString().slice(0,10); }
+  else if (which === '3days') { const t=new Date(); t.setDate(t.getDate()+3); d=t.toISOString().slice(0,10); }
+  else d = endOfWeek();
   document.getElementById('add-due').value = d;
-  document.getElementById('qs-today').classList.toggle('active', which==='today');
-  document.getElementById('qs-week').classList.toggle('active', which==='week');
+  ['qs-today','qs-tmrw','qs-3d','qs-week'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active',
+      (id==='qs-today'&&which==='today')||(id==='qs-tmrw'&&which==='tomorrow')||
+      (id==='qs-3d'&&which==='3days')||(id==='qs-week'&&which==='week'));
+  });
 }
 async function addTask(){
   const inp=document.getElementById('task-input');const title=inp.value.trim();if(!title||!S.activeId)return;
@@ -1041,12 +1069,16 @@ async function addTask(){
   qsClose();
   const p=parseInt(document.getElementById('add-pri').value);
   const maxO=Math.max(0,...wsTasks(S.activeId).filter(t=>t.priority===p).map(t=>t.order||0));
-  const t={id:uid(),workspace:S.activeId,title,notes:'',priority:p,
+  const notes = document.getElementById('add-notes-input').value.trim();
+  const t={id:uid(),workspace:S.activeId,title,notes,priority:p,
     dueDate:document.getElementById('add-due').value||null,
     project:document.getElementById('add-proj-sel').value||null,
     milestoneId:document.getElementById('add-ms-sel').value||null,
     recur:document.getElementById('add-recur').value||null,order:maxO+1,done:false,created:Date.now(),doneAt:null};
-  S.tasks.push(t);inp.value='';document.getElementById('add-due').value='';document.getElementById('add-recur').value='';
+  S.tasks.push(t);
+  inp.value='';document.getElementById('add-due').value='';document.getElementById('add-recur').value='';
+  document.getElementById('add-notes-input').value='';
+  if(detailsOpen) toggleDetails();
   inp.focus();await persist(t);render();
 }
 function toggleShowDone(){showDone=!showDone;document.getElementById('done-toggle').className='icon-btn'+(showDone?' on':'');render();}
@@ -1189,12 +1221,17 @@ document.addEventListener('keydown',e=>{
       document.activeElement.blur();searchQ='';document.getElementById('search-input').value='';expandId=null;renderMain();
     }
     if(quickSetOpen){
-      if(e.key==='1')qsSetPri(1);
-      if(e.key==='2')qsSetPri(2);
-      if(e.key==='3')qsSetPri(3);
-      if(e.key==='4')qsSetPri(4);
-      if(e.key==='t'||e.key==='T'){e.preventDefault();qsSetDate('today');}
-      if(e.key==='w'||e.key==='W'){e.preventDefault();qsSetDate('week');}
+      if(quickSetOpen){
+        if(e.key==='1')qsSetPri(1);
+        if(e.key==='2'&&!e.shiftKey){e.preventDefault();qsSetDate('tomorrow');}
+        if(e.key==='3'&&!e.shiftKey){e.preventDefault();qsSetDate('3days');}
+        if(e.key==='4')qsSetPri(4);
+        if(e.key==='t'||e.key==='T'){e.preventDefault();qsSetDate('today');}
+        if(e.key==='w'||e.key==='W'){e.preventDefault();qsSetDate('week');}
+      }
+      if(e.key==='Tab'&&(document.activeElement.id==='task-input'||document.activeElement.id==='add-notes-input')){
+        e.preventDefault(); toggleDetails();
+      }
     }
     return;
   }
