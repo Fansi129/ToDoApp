@@ -179,6 +179,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .sub-del{opacity:0;background:none;border:none;color:var(--text3);cursor:pointer;padding:0 3px;font-size:14px;line-height:1;transition:color .1s;}
 .subtask-row:hover .sub-del{opacity:1;}
 .sub-del:hover{color:var(--p1);}
+.sub-move-col{display:flex;flex-direction:column;opacity:0;transition:opacity .1s;flex-shrink:0;}
+.subtask-row:hover .sub-move-col{opacity:1;}
+.sub-move{background:none;border:none;color:var(--text3);cursor:pointer;padding:0;font-size:8px;line-height:1.1;transition:color .1s;}
+.sub-move:hover:not(:disabled){color:var(--text);}
+.sub-move:disabled{opacity:.25;cursor:default;}
 .sub-add-row{display:flex;gap:5px;margin-top:2px;}
 .sub-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:3px 7px;font-size:12px;outline:none;transition:border-color .1s;}
 .sub-input:focus{border-color:var(--accent);}
@@ -900,8 +905,12 @@ function taskEl(t, w) {
         </select>
       </div>
       <div class="subtask-section">
-        ${(t.subtasks||[]).map(s=>`
+        ${(t.subtasks||[]).map((s,idx,arr)=>`
         <div class="subtask-row">
+          <div class="sub-move-col">
+            <button class="sub-move" onclick="moveSubtask('${t.id}','${s.id}',-1)" ${idx===0?'disabled':''} title="Move up">▲</button>
+            <button class="sub-move" onclick="moveSubtask('${t.id}','${s.id}',1)" ${idx===arr.length-1?'disabled':''} title="Move down">▼</button>
+          </div>
           <div class="sub-check${s.done?' done':''}" onclick="toggleSubtask('${t.id}','${s.id}')">
             ${s.done?'<svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.5"><polyline points="1.5 6 4.5 9 10.5 3"/></svg>':''}
           </div>
@@ -1098,6 +1107,13 @@ async function toggleSubtask(taskId, subtaskId) {
   const t = S.tasks.find(x=>x.id===taskId); if(!t) return;
   const s = (t.subtasks||[]).find(x=>x.id===subtaskId); if(!s) return;
   s.done = !s.done;
+  await persist(t); renderMain();
+}
+async function moveSubtask(taskId, subtaskId, dir) {
+  const t = S.tasks.find(x=>x.id===taskId); if(!t) return;
+  const arr = t.subtasks||[]; const i = arr.findIndex(s=>s.id===subtaskId); if(i<0) return;
+  const j = i+dir; if(j<0||j>=arr.length) return;
+  [arr[i],arr[j]] = [arr[j],arr[i]];
   await persist(t); renderMain();
 }
 async function renameSubtask(taskId, subtaskId, title) {
