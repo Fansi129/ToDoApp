@@ -169,8 +169,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .sub-check{width:14px;height:14px;border-radius:3px;border:2px solid var(--border);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:border-color .1s,background .1s;}
 .sub-check:hover{border-color:var(--done-col);}
 .sub-check.done{background:var(--done-col);border-color:var(--done-col);}
-.sub-title{flex:1;font-size:12px;color:var(--text2);}
+.sub-title{flex:1;font-size:12px;color:var(--text2);background:none;border:1px solid transparent;border-radius:4px;padding:2px 4px;font-family:inherit;outline:none;transition:border-color .1s,background .1s;}
+.sub-title:hover{background:var(--surface2);}
+.sub-title:focus{border-color:var(--accent);background:var(--surface2);}
 .sub-title.done{text-decoration:line-through;opacity:.5;}
+.title-edit{background:none;border:1px solid transparent;border-radius:6px;color:var(--text);padding:4px 6px;font-size:14px;font-family:inherit;font-weight:500;outline:none;width:100%;margin-bottom:2px;transition:border-color .1s,background .1s;}
+.title-edit:hover{background:var(--surface2);}
+.title-edit:focus{border-color:var(--accent);background:var(--surface2);}
 .sub-del{opacity:0;background:none;border:none;color:var(--text3);cursor:pointer;padding:0 3px;font-size:14px;line-height:1;transition:color .1s;}
 .subtask-row:hover .sub-del{opacity:1;}
 .sub-del:hover{color:var(--p1);}
@@ -871,6 +876,7 @@ function taskEl(t, w) {
       <button class="task-del" onclick="delTask('${t.id}')">×</button>
     </div>
     <div class="task-expand ${open?'open':''}">
+      <input type="text" class="title-edit" value="${esc(t.title)}" placeholder="Title" onchange="updateTitle('${t.id}',this.value)">
       <textarea class="notes-ta" placeholder="Notes…" oninput="queueSaveNotes('${t.id}',this.value)">${esc(t.notes||'')}</textarea>
       <div class="expand-row">
         <input type="date" class="exp-input" value="${t.dueDate||''}" onchange="updateField('${t.id}','dueDate',this.value||null)" title="Due">
@@ -899,7 +905,7 @@ function taskEl(t, w) {
           <div class="sub-check${s.done?' done':''}" onclick="toggleSubtask('${t.id}','${s.id}')">
             ${s.done?'<svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.5"><polyline points="1.5 6 4.5 9 10.5 3"/></svg>':''}
           </div>
-          <span class="sub-title${s.done?' done':''}">${esc(s.title)}</span>
+          <input class="sub-title${s.done?' done':''}" value="${esc(s.title)}" onchange="renameSubtask('${t.id}','${s.id}',this.value)">
           <button class="sub-del" onclick="deleteSubtask('${t.id}','${s.id}')">×</button>
         </div>`).join('')}
         <div class="sub-add-row">
@@ -1092,6 +1098,23 @@ async function toggleSubtask(taskId, subtaskId) {
   const t = S.tasks.find(x=>x.id===taskId); if(!t) return;
   const s = (t.subtasks||[]).find(x=>x.id===subtaskId); if(!s) return;
   s.done = !s.done;
+  await persist(t); renderMain();
+}
+async function renameSubtask(taskId, subtaskId, title) {
+  const t = S.tasks.find(x=>x.id===taskId); if(!t) return;
+  const s = (t.subtasks||[]).find(x=>x.id===subtaskId); if(!s) return;
+  title = title.trim();
+  if(!title) { renderMain(); return; }
+  if(title===s.title) return;
+  s.title = title;
+  await persist(t); renderMain();
+}
+async function updateTitle(id, title) {
+  const t = S.tasks.find(x=>x.id===id); if(!t) return;
+  title = title.trim();
+  if(!title) { renderMain(); return; }
+  if(title===t.title) return;
+  t.title = title;
   await persist(t); renderMain();
 }
 async function addSubtask(taskId) {
