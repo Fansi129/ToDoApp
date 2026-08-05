@@ -55,15 +55,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .ws-cnt{font-size:11px;color:var(--text3);background:var(--surface3);border-radius:10px;padding:1px 6px;min-width:18px;text-align:center;}
 .ws-row.active .ws-cnt{background:var(--accent-dim);color:var(--accent);}
 .ws-num{font-size:10px;color:var(--text3);}
-.proj-list{padding-left:20px;display:flex;flex-direction:column;gap:1px;margin-bottom:2px;}
-.proj-row{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:var(--radius);cursor:pointer;font-size:12px;color:var(--text3);transition:background .1s,color .1s;}
-.proj-row:hover{background:var(--surface2);color:var(--text2);}
-.proj-row.active{background:var(--surface3);color:var(--text);}
-.proj-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
-.proj-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.proj-cnt{font-size:10px;color:var(--text3);}
-.ws-add-proj{display:flex;align-items:center;gap:6px;padding:4px 8px;font-size:11px;color:var(--text3);cursor:pointer;border-radius:var(--radius);transition:color .1s;}
-.ws-add-proj:hover{color:var(--accent);}
 #add-ws-btn{margin:8px;padding:8px 12px;background:none;border:1px dashed var(--border);border-radius:var(--radius);color:var(--text3);font-size:13px;cursor:pointer;text-align:left;transition:border-color .1s,color .1s;}
 #add-ws-btn:hover{border-color:var(--accent);color:var(--accent);}
 
@@ -71,7 +62,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 #topbar{display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--surface);}
 #topbar-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
 #topbar-name{font-size:15px;font-weight:600;}
-#topbar-proj{font-size:13px;color:var(--text3);margin-left:-4px;}
 #search-wrap{flex:1;display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 9px;gap:5px;transition:border-color .15s;}
 #search-wrap:focus-within{border-color:var(--accent);}
 #search-wrap svg{color:var(--text3);flex-shrink:0;}
@@ -86,8 +76,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 #filter-bar{display:flex;align-items:stretch;border-bottom:1px solid var(--border);background:var(--surface);overflow:hidden;}
 #time-pills{display:flex;align-items:center;gap:5px;padding:7px 14px;flex-shrink:0;}
 .filter-sep{width:1px;background:var(--border);margin:7px 0;flex-shrink:0;}
-#proj-pills{display:flex;align-items:center;gap:5px;padding:7px 14px;overflow-x:auto;flex:1;}
-#ms-pills{display:flex;align-items:center;gap:5px;padding:7px 14px;overflow-x:auto;border-left:1px solid var(--border);}
+#ms-pills{display:flex;align-items:center;gap:5px;padding:7px 14px;overflow-x:auto;flex:1;}
 .tpill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:none;color:var(--text2);transition:all .1s;white-space:nowrap;flex-shrink:0;}
 .tpill:hover{background:var(--surface2);color:var(--text);}
 .tpill.active{color:#fff;border-color:transparent;}
@@ -95,8 +84,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .ppill{padding:3px 10px;border-radius:20px;font-size:11px;cursor:pointer;border:1px solid var(--border);background:none;color:var(--text2);transition:all .1s;white-space:nowrap;flex-shrink:0;}
 .ppill:hover{background:var(--surface2);color:var(--text);}
 .ppill.active{color:#fff;border-color:transparent;}
-.ppill-edit{font-size:10px;opacity:0;padding:3px 4px;background:none;border:none;color:var(--text2);cursor:pointer;margin-left:-4px;}
-.ppill:hover+.ppill-edit,.ppill-edit:hover{opacity:1;}
 .pill-add{padding:3px 10px;border-radius:20px;font-size:11px;cursor:pointer;border:1px dashed var(--border);background:none;color:var(--text3);transition:all .1s;flex-shrink:0;}
 .pill-add:hover{border-color:var(--accent);color:var(--accent);}
 
@@ -261,7 +248,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 
 <!-- Rail (always visible) -->
 <div id="rail" style="display:none">
-  <button id="rail-toggle" onclick="toggleSidebar()" title="Workspaces (W)">
+  <button id="rail-toggle" onclick="toggleSidebar()" title="Projects (W)">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
   <div id="rail-dots"></div>
@@ -276,27 +263,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
   <!-- Sidebar panel -->
   <div id="sidebar-panel">
     <div id="sidebar-head">
-      <span>Workspaces</span>
+      <span>Projects</span>
       <button id="sidebar-close" onclick="closeSidebar()">✕</button>
     </div>
     <div id="ws-list"></div>
-    <button id="add-ws-btn" onclick="openWsModal()">+ New workspace</button>
+    <button id="add-ws-btn" onclick="openWsModal()">+ New project</button>
   </div>
 
   <!-- Main -->
-  <div id="no-ws"><span>Create a workspace to get started</span></div>
+  <div id="no-ws"><span>Create a project to get started</span></div>
   <div id="ws-view" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
 
     <div id="topbar">
       <div id="topbar-dot"></div>
       <div id="topbar-name"></div>
-      <span id="topbar-proj"></span>
       <div id="search-wrap">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input id="search-input" placeholder="Search… (/)">
       </div>
       <div id="topbar-actions">
-        <button class="icon-btn" onclick="openWsModal(true)" title="Edit workspace">
+        <button class="icon-btn" onclick="openWsModal(true)" title="Edit project">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
         <button class="icon-btn" id="done-toggle" onclick="toggleShowDone()" title="Show completed">
@@ -305,11 +291,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
       </div>
     </div>
 
-    <!-- Filter bar: time | projects | milestones -->
+    <!-- Filter bar: time | milestones -->
     <div id="filter-bar">
       <div id="time-pills"></div>
       <div class="filter-sep"></div>
-      <div id="proj-pills"></div>
       <div id="ms-pills"></div>
     </div>
 
@@ -389,30 +374,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 
 <div id="save-ind">Saving…</div>
 
-<!-- Workspace Modal -->
+<!-- Project Modal -->
 <div id="ws-overlay" class="overlay" onclick="overlayClick(event,'ws-overlay')">
   <div class="modal">
-    <h3 id="ws-modal-title">New Workspace</h3>
-    <div class="mfield"><label>Name</label><input id="ws-name" class="minput" type="text" placeholder="e.g. GameReady"></div>
+    <h3 id="ws-modal-title">New Project</h3>
+    <div class="mfield"><label>Name</label><input id="ws-name" class="minput" type="text" placeholder="e.g. Marketing"></div>
     <div class="mfield"><label>Color</label><div class="cpicker" id="ws-cpicker"></div></div>
     <div class="mactions">
       <button id="ws-del-btn" class="btn-del" onclick="deleteWs()" style="display:none">Delete</button>
       <button class="btn-sec" onclick="closeOverlay('ws-overlay')">Cancel</button>
       <button class="btn-pri" id="ws-save-btn" onclick="saveWs()">Create</button>
-    </div>
-  </div>
-</div>
-
-<!-- Project Modal -->
-<div id="proj-overlay" class="overlay" onclick="overlayClick(event,'proj-overlay')">
-  <div class="modal">
-    <h3 id="proj-modal-title">New Project</h3>
-    <div class="mfield"><label>Name</label><input id="proj-name" class="minput" type="text" placeholder="e.g. AquaAssault"></div>
-    <div class="mfield"><label>Color</label><div class="cpicker" id="proj-cpicker"></div></div>
-    <div class="mactions">
-      <button id="proj-del-btn" class="btn-del" onclick="deleteProj()" style="display:none">Delete</button>
-      <button class="btn-sec" onclick="closeOverlay('proj-overlay')">Cancel</button>
-      <button class="btn-pri" id="proj-save-btn" onclick="saveProj()">Create</button>
     </div>
   </div>
 </div>
@@ -454,12 +425,11 @@ const TODAY = new Date().toISOString().slice(0,10);
 
 // ── STATE ────────────────────────────────────────────────────────────────────
 let rootDir = null, tasksDir = null;
-let S = { workspaces: [], tasks: [], activeId: null };
+let S = { projects: [], tasks: [], activeId: null };
 let taskFileMap = {}; // id -> current filename on disk
 
 let sidebarOpen = false;
 let timeFilter = 'today';
-let projFilter = 'all';
 let msFilter = 'all';
 let showDone = false;
 let searchQ = '';
@@ -469,7 +439,6 @@ let notesTimer = {};
 
 // Modal state
 let editWsId = null, wsColor = COLORS[0];
-let editProjId = null, projColor = COLORS[4];
 let editMsId = null, msColor = COLORS[5];
 
 // ── FILE SYSTEM ───────────────────────────────────────────────────────────────
@@ -505,18 +474,31 @@ async function resumeDir() {
 
 async function initFromDir() {
   tasksDir = await rootDir.getDirectoryHandle('tasks', { create: true });
-  const wsData = await readJSON('workspaces.json');
-  if (wsData) {
-    S.workspaces = (wsData.workspaces || []).map(migrateWs);
-    S.activeId = wsData.activeId || S.workspaces[0]?.id || null;
+  let projData = await readJSON('projects.json');
+  if (!projData) {
+    // One-time fallback migration from the old workspace/project format, if present.
+    const wsData = await readJSON('workspaces.json');
+    if (wsData) {
+      const projects = [];
+      (wsData.workspaces || []).forEach(w => {
+        projects.push({ id: w.id, name: w.name, color: w.color, milestones: w.milestones || [] });
+        (w.projects || []).forEach(p => projects.push({ id: p.id, name: p.name, color: p.color, milestones: p.milestones || [] }));
+      });
+      projData = { projects, activeId: wsData.activeId || projects[0]?.id || null };
+      await writeJSON('projects.json', projData);
+    }
+  }
+  if (projData) {
+    S.projects = (projData.projects || []).map(migrateProj);
+    S.activeId = projData.activeId || S.projects[0]?.id || null;
   } else {
-    S.workspaces = SEED_WORKSPACES;
-    S.activeId = 'ws-gr';
-    await writeJSON('workspaces.json', { workspaces: S.workspaces, activeId: S.activeId });
+    S.projects = SEED_PROJECTS;
+    S.activeId = SEED_PROJECTS[0]?.id || null;
+    await writeJSON('projects.json', { projects: S.projects, activeId: S.activeId });
     for (const t of SEED_TASKS) await writeTaskFile(t);
   }
   const saved = localStorage.getItem('wt-active');
-  if (saved && S.workspaces.find(w => w.id === saved)) S.activeId = saved;
+  if (saved && S.projects.find(p => p.id === saved)) S.activeId = saved;
   const savedTF = localStorage.getItem('wt-tf');
   if (savedTF) timeFilter = savedTF;
   S.tasks = await loadAllTasks();
@@ -524,8 +506,8 @@ async function initFromDir() {
   render();
 }
 
-function migrateWs(w) {
-  return { ...w, projects: (w.projects || []).map(p => ({ ...p, milestones: p.milestones || [] })) };
+function migrateProj(p) {
+  return { ...p, milestones: p.milestones || [] };
 }
 
 function taskFilename(t) {
@@ -535,19 +517,23 @@ function taskFilename(t) {
 async function loadAllTasks() {
   const tasks = [];
   taskFileMap = {};
+  const fieldMigrated = [];
   for await (const [name, handle] of tasksDir) {
     if (handle.kind === 'file' && name.endsWith('.json')) {
       try {
         const f = await handle.getFile();
         const t = JSON.parse(await f.text());
+        if ('workspace' in t) { t.project = t.project || t.workspace; delete t.workspace; fieldMigrated.push(t); }
         tasks.push(t);
         taskFileMap[t.id] = name;
       } catch {}
     }
   }
-  // Migrate files whose name doesn't match new scheme
+  // Migrate files whose name doesn't match new scheme, plus any field-level migrations above.
   const toMigrate = tasks.filter(t => taskFileMap[t.id] !== taskFilename(t));
-  await Promise.all(toMigrate.map(t => writeTaskFile(t)));
+  const ids = new Set();
+  const writes = [...toMigrate, ...fieldMigrated].filter(t => (ids.has(t.id) ? false : (ids.add(t.id), true)));
+  await Promise.all(writes.map(t => writeTaskFile(t)));
   return tasks;
 }
 
@@ -576,7 +562,7 @@ async function writeJSON(name, data) {
   const w = await fh.createWritable(); await w.write(JSON.stringify(data, null, 2)); await w.close();
 }
 
-async function saveWsFile() { await writeJSON('workspaces.json', { workspaces: S.workspaces, activeId: S.activeId }); }
+async function saveWsFile() { await writeJSON('projects.json', { projects: S.projects, activeId: S.activeId }); }
 
 function flashSave() {
   const el = document.getElementById('save-ind'); el.className = 'show';
@@ -616,31 +602,13 @@ function closeSidebar() {
 function renderSidebarPanel() {
   const list = document.getElementById('ws-list');
   list.innerHTML = '';
-  S.workspaces.forEach((w, i) => {
-    const cnt = wsTasks(w.id).filter(t => !t.done).length;
-    const isActive = w.id === S.activeId;
-    // Workspace row
+  S.projects.forEach((p, i) => {
+    const cnt = projTasks(p.id).filter(t => !t.done).length;
+    const isActive = p.id === S.activeId;
     const row = el('div', 'ws-row' + (isActive ? ' active' : ''));
-    row.innerHTML = `<span class="ws-dot" style="background:${w.color}"></span><span class="ws-row-name">${esc(w.name)}</span>${cnt?`<span class="ws-cnt">${cnt}</span>`:''}<span class="ws-num">${i<9?i+1:''}</span>`;
-    row.onclick = () => { S.activeId=w.id; projFilter='all'; msFilter='all'; closeSidebar(); render(); };
+    row.innerHTML = `<span class="ws-dot" style="background:${p.color}"></span><span class="ws-row-name">${esc(p.name)}</span>${cnt?`<span class="ws-cnt">${cnt}</span>`:''}<span class="ws-num">${i<9?i+1:''}</span>`;
+    row.onclick = () => { S.activeId=p.id; msFilter='all'; closeSidebar(); render(); };
     list.appendChild(row);
-    // Projects (only under active workspace)
-    if (isActive) {
-      const projList = el('div', 'proj-list');
-      (w.projects||[]).forEach(p => {
-        const pcnt = wsTasks(w.id).filter(t=>!t.done&&t.project===p.id).length;
-        const prow = el('div', 'proj-row' + (projFilter===p.id?' active':''));
-        prow.innerHTML = `<span class="proj-dot" style="background:${p.color}"></span><span class="proj-name">${esc(p.name)}</span>${pcnt?`<span class="proj-cnt">${pcnt}</span>`:''}`;
-        prow.onclick = e => { e.stopPropagation(); S.activeId=w.id; projFilter=p.id; msFilter='all'; closeSidebar(); render(); };
-        projList.appendChild(prow);
-      });
-      // Add project button
-      const addP = el('div', 'ws-add-proj');
-      addP.innerHTML = '+ New project';
-      addP.onclick = e => { e.stopPropagation(); openProjModal(); };
-      projList.appendChild(addP);
-      list.appendChild(projList);
-    }
   });
 }
 
@@ -655,106 +623,74 @@ function render() {
 function renderRail() {
   const dots = document.getElementById('rail-dots');
   dots.innerHTML = '';
-  S.workspaces.forEach(w => {
-    const d = el('div', 'rail-dot' + (w.id===S.activeId?' active':''));
-    d.style.background = w.color;
-    d.title = w.name;
-    d.onclick = () => { S.activeId=w.id; projFilter='all'; msFilter='all'; render(); if(sidebarOpen)renderSidebarPanel(); };
+  S.projects.forEach(p => {
+    const d = el('div', 'rail-dot' + (p.id===S.activeId?' active':''));
+    d.style.background = p.color;
+    d.title = p.name;
+    d.onclick = () => { S.activeId=p.id; msFilter='all'; render(); if(sidebarOpen)renderSidebarPanel(); };
     dots.appendChild(d);
   });
 }
 
 function renderMain() {
-  const w = S.workspaces.find(x=>x.id===S.activeId);
-  document.getElementById('no-ws').className = w ? '' : 'show';
+  const p = S.projects.find(x=>x.id===S.activeId);
+  document.getElementById('no-ws').className = p ? '' : 'show';
   const view = document.getElementById('ws-view');
-  if (!w) { view.style.display='none'; return; }
+  if (!p) { view.style.display='none'; return; }
   view.style.display = 'flex';
 
-  // Topbar
-  document.getElementById('topbar-dot').style.background = w.color;
-  document.getElementById('topbar-name').textContent = w.name;
-  const proj = (w.projects||[]).find(p=>p.id===projFilter);
-  document.getElementById('topbar-proj').textContent = proj ? ` / ${proj.name}` : '';
+  document.getElementById('topbar-dot').style.background = p.color;
+  document.getElementById('topbar-name').textContent = p.name;
 
-  renderFilterBar(w);
-  renderTodayBar(w);
-  renderUpNext(w);
-  renderTasks(w);
-  renderAddSelects(w);
+  renderFilterBar(p);
+  renderTodayBar(p);
+  renderUpNext(p);
+  renderTasks(p);
+  renderAddSelects(p);
 }
 
-function renderFilterBar(w) {
+function renderFilterBar(p) {
   // Time pills
   const tp = document.getElementById('time-pills');
   tp.innerHTML = '';
-  const wt = wsTasks(w.id);
+  const pt = projTasks(p.id);
   const E3 = endOf3Days(), EW = endOfWeek();
-  const todayDone = wt.filter(t=>t.done&&t.doneAt&&new Date(t.doneAt).toISOString().slice(0,10)===TODAY).length +
-    wt.filter(t=>t.done&&t.dueDate===TODAY).length;
-  // unique today done
-  const todayTasks = wt.filter(t=>t.dueDate===TODAY);
+  const todayTasks = pt.filter(t=>t.dueDate===TODAY);
   const todayDoneCount = todayTasks.filter(t=>t.done).length;
   const todayTotal = todayTasks.length;
 
   const TOMORROW = (()=>{const d=new Date();d.setDate(d.getDate()+1);return d.toISOString().slice(0,10);})();
   const timeOpts = [
     { key:'all', label:'All', count: null },
-    { key:'overdue', label:'Overdue', count: wt.filter(t=>!t.done&&t.dueDate&&t.dueDate<TODAY).length, warn:true },
+    { key:'overdue', label:'Overdue', count: pt.filter(t=>!t.done&&t.dueDate&&t.dueDate<TODAY).length, warn:true },
     { key:'today', label:'Today', count: todayTotal, done: todayDoneCount },
-    { key:'tomorrow', label:'Tomorrow', count: wt.filter(t=>!t.done&&t.dueDate===TOMORROW).length },
-    { key:'3days', label:'3 Days', count: wt.filter(t=>!t.done&&t.dueDate&&t.dueDate>=TODAY&&t.dueDate<=E3).length },
-    { key:'week', label:'Week', count: wt.filter(t=>!t.done&&t.dueDate&&t.dueDate>=TODAY&&t.dueDate<=EW).length },
+    { key:'tomorrow', label:'Tomorrow', count: pt.filter(t=>!t.done&&t.dueDate===TOMORROW).length },
+    { key:'3days', label:'3 Days', count: pt.filter(t=>!t.done&&t.dueDate&&t.dueDate>=TODAY&&t.dueDate<=E3).length },
+    { key:'week', label:'Week', count: pt.filter(t=>!t.done&&t.dueDate&&t.dueDate>=TODAY&&t.dueDate<=EW).length },
   ];
   timeOpts.forEach(opt => {
     let label = opt.label;
     if (opt.key==='today' && opt.count>0) label = `Today ${opt.done}/${opt.count}`;
     else if (opt.count != null && opt.count > 0) label = `${opt.label} ${opt.count}`;
     const pill = mkBtn('tpill' + (timeFilter===opt.key?' active':'') + (opt.warn&&opt.count>0&&timeFilter!==opt.key?' warn':''), label);
-    if (timeFilter===opt.key) pill.style.background = w.color;
+    if (timeFilter===opt.key) pill.style.background = p.color;
     pill.onclick = () => { timeFilter=opt.key; render(); };
     tp.appendChild(pill);
   });
 
-  // Project pills
-  const pp = document.getElementById('proj-pills');
-  pp.innerHTML = '';
-  if ((w.projects||[]).length > 0) {
-    const allP = mkBtn('ppill' + (projFilter==='all'?' active':''), 'All');
-    if (projFilter==='all') allP.style.background = w.color;
-    allP.onclick = () => { projFilter='all'; render(); };
-    pp.appendChild(allP);
-    (w.projects||[]).forEach(p => {
-      const pcnt = wt.filter(t=>!t.done&&t.project===p.id).length;
-      const pill = mkBtn('ppill' + (projFilter===p.id?' active':''), pcnt ? `${esc(p.name)} ${pcnt}` : esc(p.name));
-      if (projFilter===p.id) pill.style.background = p.color;
-      pill.onclick = () => { projFilter=p.id; render(); };
-      pp.appendChild(pill);
-      const editBtn = mkBtn('ppill-edit', '✎');
-      editBtn.onclick = e => { e.stopPropagation(); openProjModal(p.id); };
-      pp.appendChild(editBtn);
-    });
-  }
-  const addProjBtn = mkBtn('pill-add', '+ Project');
-  addProjBtn.onclick = () => openProjModal(null);
-  pp.appendChild(addProjBtn);
-
-  // Milestone pills (workspace-level, shown if any exist)
+  // Milestone pills (belong directly to the active project)
   const mp = document.getElementById('ms-pills');
   mp.innerHTML = '';
-  const allMs = (w.projects||[]).flatMap(p=>(p.milestones||[]).map(m=>({...m,projColor:p.color})));
-  // Also workspace-level milestones (legacy)
-  const wsMs = w.milestones || [];
-  const combined = [...wsMs.map(m=>({...m})), ...allMs];
-  if (combined.length > 0) {
+  const allMs = p.milestones || [];
+  if (allMs.length > 0) {
     mp.style.borderLeft = '1px solid var(--border)';
     const allM = mkBtn('ppill' + (msFilter==='all'?' active':''), 'All ms');
     if (msFilter==='all') allM.style.background = '#444';
     allM.onclick = () => { msFilter='all'; render(); };
     mp.appendChild(allM);
-    combined.forEach(ms => {
+    allMs.forEach(ms => {
       const pill = mkBtn('ppill' + (msFilter===ms.id?' active':''), esc(ms.name));
-      if (msFilter===ms.id) pill.style.background = ms.color || ms.projColor || '#666';
+      if (msFilter===ms.id) pill.style.background = ms.color || '#666';
       pill.onclick = () => { msFilter=ms.id; render(); };
       mp.appendChild(pill);
     });
@@ -767,12 +703,11 @@ function renderFilterBar(w) {
   }
 }
 
-function renderTodayBar(w) {
+function renderTodayBar(p) {
   const bar = document.getElementById('today-bar');
   if (timeFilter !== 'today') { bar.className = ''; return; }
-  const todayTasks = wsTasks(w.id).filter(t => {
+  const todayTasks = projTasks(p.id).filter(t => {
     if (t.dueDate !== TODAY) return false;
-    if (projFilter !== 'all' && t.project !== projFilter) return false;
     if (msFilter !== 'all' && t.milestoneId !== msFilter) return false;
     return true;
   });
@@ -783,8 +718,8 @@ function renderTodayBar(w) {
   document.getElementById('today-label').textContent = total ? `Today — ${done} of ${total} done` : 'Today — no tasks due';
 }
 
-function renderUpNext(w) {
-  const active = visibleTasks(w).filter(t=>!t.done).sort(byPri);
+function renderUpNext(p) {
+  const active = visibleTasks(p).filter(t=>!t.done).sort(byPri);
   const el2 = document.getElementById('up-next');
   if (!active.length) { el2.className = ''; return; }
   el2.className = 'show';
@@ -797,42 +732,38 @@ function renderUpNext(w) {
   else d.style.display='none';
 }
 
-function renderTasks(w) {
+function renderTasks(p) {
   const list = document.getElementById('task-list');
   list.innerHTML = '';
-  const visible = visibleTasks(w);
+  const visible = visibleTasks(p);
   const active = visible.filter(t=>!t.done).sort(byPri);
   const done = visible.filter(t=>t.done).sort((a,b)=>(b.doneAt||0)-(a.doneAt||0));
   document.getElementById('empty-state').className = (!active.length && (!showDone||!done.length)) ? 'show' : '';
 
-  [1,2,3,4].forEach(p => {
-    const grp = active.filter(t=>t.priority===p);
+  [1,2,3,4].forEach(pri => {
+    const grp = active.filter(t=>t.priority===pri);
     if (!grp.length) return;
-    list.appendChild(secLabel(`P${p} · ${PNAMES[p]}`));
-    grp.forEach(t => list.appendChild(taskEl(t, w)));
+    list.appendChild(secLabel(`P${pri} · ${PNAMES[pri]}`));
+    grp.forEach(t => list.appendChild(taskEl(t, p)));
   });
   if (showDone && done.length) {
     list.appendChild(secLabel(`Completed · ${done.length}`));
-    done.forEach(t => list.appendChild(taskEl(t, w)));
+    done.forEach(t => list.appendChild(taskEl(t, p)));
   }
 }
 
-function visibleTasks(w) {
+function visibleTasks(p) {
   const q = searchQ.toLowerCase();
-  return wsTasks(w.id).filter(t => {
+  return projTasks(p.id).filter(t => {
     if (!matchTime(t)) return false;
-    if (projFilter !== 'all' && (t.project||null) !== projFilter) return false;
     if (msFilter !== 'all' && (t.milestoneId||null) !== msFilter) return false;
     if (q && !t.title.toLowerCase().includes(q) && !(t.notes||'').toLowerCase().includes(q)) return false;
     return true;
   });
 }
 
-function taskEl(t, w) {
-  const proj = (w.projects||[]).find(p=>p.id===t.project);
-  const allMs = (w.projects||[]).flatMap(p=>(p.milestones||[]))||[];
-  const wsMs = w.milestones||[];
-  const ms = [...wsMs,...allMs].find(m=>m.id===t.milestoneId);
+function taskEl(t, p) {
+  const ms = (p.milestones||[]).find(m=>m.id===t.milestoneId);
   const subDone = (t.subtasks||[]).filter(s=>s.done).length;
   const subTotal = (t.subtasks||[]).length;
   const open = expandId===t.id;
@@ -855,8 +786,7 @@ function taskEl(t, w) {
     dragSrc=null; div.classList.remove('drag-over'); render();
   };
 
-  // Build milestone options for expand form
-  const msOpts = [...(w.milestones||[]), ...(w.projects||[]).flatMap(p=>(p.milestones||[]))];
+  const msOpts = p.milestones || [];
 
   div.innerHTML = `
     <div class="task-row">
@@ -869,7 +799,6 @@ function taskEl(t, w) {
         ${t.notes?'<span class="notes-dot"></span>':''}
         ${t.recur?'<span class="recur-icon" title="Repeating">↻</span>':''}
         ${subTotal>0?`<span class="sub-progress">${subDone}/${subTotal}</span>`:''}
-        ${proj?`<span class="tagbadge" style="background:${proj.color}">${esc(proj.name)}</span>`:''}
         ${ms?`<span class="tagbadge" style="background:${ms.color||'#666'}">${esc(ms.name)}</span>`:''}
         ${t.dueDate?`<span class="dbadge ${dueCls(t.dueDate)}">${fmtDate(t.dueDate)}</span>`:''}
         <span class="pbadge p${t.priority}">P${t.priority}</span>
@@ -886,11 +815,10 @@ function taskEl(t, w) {
       <div class="expand-row">
         <input type="date" class="exp-input" value="${t.dueDate||''}" onchange="updateField('${t.id}','dueDate',this.value||null)" title="Due">
         <select class="exp-sel" onchange="updatePriority('${t.id}',parseInt(this.value))">
-          ${[1,2,3,4].map(p=>`<option value="${p}"${t.priority===p?' selected':''}>${PNAMES[p]}</option>`).join('')}
+          ${[1,2,3,4].map(pr=>`<option value="${pr}"${t.priority===pr?' selected':''}>${PNAMES[pr]}</option>`).join('')}
         </select>
-        <select class="exp-sel" onchange="updateField('${t.id}','project',this.value||null)">
-          <option value="">No project</option>
-          ${(w.projects||[]).map(p=>`<option value="${p.id}"${t.project===p.id?' selected':''}>${esc(p.name)}</option>`).join('')}
+        <select class="exp-sel" onchange="updateField('${t.id}','project',this.value)" title="Move to project">
+          ${S.projects.map(pj=>`<option value="${pj.id}"${t.project===pj.id?' selected':''}>${esc(pj.name)}</option>`).join('')}
         </select>
         <select class="exp-sel" onchange="updateField('${t.id}','milestoneId',this.value||null)">
           <option value="">No milestone</option>
@@ -926,20 +854,19 @@ function taskEl(t, w) {
   return div;
 }
 
-function renderAddSelects(w) {
+function renderAddSelects(p) {
   const projSel = document.getElementById('add-proj-sel');
-  projSel.innerHTML = '<option value="">No project</option>';
-  (w.projects||[]).forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;projSel.appendChild(o);});
-  if (projFilter!=='all') projSel.value = projFilter;
+  projSel.innerHTML = '';
+  S.projects.forEach(pj=>{const o=document.createElement('option');o.value=pj.id;o.textContent=pj.name;projSel.appendChild(o);});
+  projSel.value = p.id;
 
   const msSel = document.getElementById('add-ms-sel');
   msSel.innerHTML = '<option value="">No milestone</option>';
-  const msOpts = [...(w.milestones||[]),...(w.projects||[]).flatMap(p=>(p.milestones||[]))];
-  msOpts.forEach(m=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.name;msSel.appendChild(o);});
+  (p.milestones||[]).forEach(m=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.name;msSel.appendChild(o);});
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
-function wsTasks(wsId) { return S.tasks.filter(t=>t.workspace===wsId); }
+function projTasks(projId) { return S.tasks.filter(t=>t.project===projId); }
 function byPri(a,b) { if(a.priority!==b.priority)return a.priority-b.priority; if((a.order||0)!==(b.order||0))return(a.order||0)-(b.order||0); return(a.created||0)-(b.created||0); }
 function dueCls(d){if(!d)return'';if(d<TODAY)return'overdue';if(d===TODAY)return'today';return'';}
 function fmtDate(d){if(!d)return'';const[,m,day]=d.split('-');return`${day}/${m}`;}
@@ -1044,8 +971,8 @@ async function delTask(id){S.tasks=S.tasks.filter(x=>x.id!==id);if(expandId===id
 function toggleExpand(id){expandId=expandId===id?null:id;renderMain();}
 function queueSaveNotes(id,v){clearTimeout(notesTimer[id]);notesTimer[id]=setTimeout(async()=>{const t=S.tasks.find(x=>x.id===id);if(t){t.notes=v;await persist(t);}},600);}
 async function updateField(id,field,val){const t=S.tasks.find(x=>x.id===id);if(!t)return;t[field]=val;await persist(t);render();}
-async function updatePriority(id,newP){const t=S.tasks.find(x=>x.id===id);if(!t)return;const maxO=Math.max(0,...wsTasks(t.workspace).filter(x=>x.priority===newP&&x.id!==id).map(x=>x.order||0));t.priority=newP;t.order=maxO+1;await persist(t);render();}
-async function completeUpNext(){const w=S.workspaces.find(x=>x.id===S.activeId);if(!w)return;const top=visibleTasks(w).filter(t=>!t.done).sort(byPri)[0];if(!top)return;top.done=true;top.doneAt=Date.now();await persist(top);if(top.recur)await spawnNextRecurrence(top);render();}
+async function updatePriority(id,newP){const t=S.tasks.find(x=>x.id===id);if(!t)return;const maxO=Math.max(0,...projTasks(t.project).filter(x=>x.priority===newP&&x.id!==id).map(x=>x.order||0));t.priority=newP;t.order=maxO+1;await persist(t);render();}
+async function completeUpNext(){const p=S.projects.find(x=>x.id===S.activeId);if(!p)return;const top=visibleTasks(p).filter(t=>!t.done).sort(byPri)[0];if(!top)return;top.done=true;top.doneAt=Date.now();await persist(top);if(top.recur)await spawnNextRecurrence(top);render();}
 let quickSetOpen = false;
 let detailsOpen = false;
 function toggleDetails() {
@@ -1086,12 +1013,13 @@ async function addTask(){
   const hasDue = document.getElementById('add-due').value;
   if(!hasDue && !quickSetOpen){ qsOpen(); return; }
   qsClose();
-  const p=parseInt(document.getElementById('add-pri').value);
-  const maxO=Math.max(0,...wsTasks(S.activeId).filter(t=>t.priority===p).map(t=>t.order||0));
+  const pri=parseInt(document.getElementById('add-pri').value);
+  const proj=document.getElementById('add-proj-sel').value||S.activeId;
+  const maxO=Math.max(0,...projTasks(proj).filter(t=>t.priority===pri).map(t=>t.order||0));
   const notes = document.getElementById('add-notes-input').value.trim();
-  const t={id:uid(),workspace:S.activeId,title,notes,priority:p,
+  const t={id:uid(),title,notes,priority:pri,
     dueDate:document.getElementById('add-due').value||null,
-    project:document.getElementById('add-proj-sel').value||null,
+    project:proj,
     milestoneId:document.getElementById('add-ms-sel').value||null,
     recur:document.getElementById('add-recur').value||null,order:maxO+1,done:false,created:Date.now(),doneAt:null};
   S.tasks.push(t);
@@ -1148,66 +1076,34 @@ async function deleteSubtask(taskId, subtaskId) {
   await persist(t); renderMain();
 }
 
-// ── WORKSPACE OPS ─────────────────────────────────────────────────────────────
+// ── PROJECT OPS (top-level; formerly "workspace") ──────────────────────────────
 function openWsModal(edit=false){
-  editWsId=edit?S.activeId:null;const w=edit?S.workspaces.find(x=>x.id===S.activeId):null;
-  wsColor=w?w.color:COLORS[0];
-  document.getElementById('ws-modal-title').textContent=edit?'Edit Workspace':'New Workspace';
-  document.getElementById('ws-name').value=w?w.name:'';
+  editWsId=edit?S.activeId:null;const p=edit?S.projects.find(x=>x.id===S.activeId):null;
+  wsColor=p?p.color:COLORS[0];
+  document.getElementById('ws-modal-title').textContent=edit?'Edit Project':'New Project';
+  document.getElementById('ws-name').value=p?p.name:'';
   document.getElementById('ws-save-btn').textContent=edit?'Save':'Create';
-  document.getElementById('ws-del-btn').style.display=edit&&S.workspaces.length>1?'block':'none';
+  document.getElementById('ws-del-btn').style.display=edit&&S.projects.length>1?'block':'none';
   buildCpicker('ws-cpicker',wsColor,c=>wsColor=c);
   document.getElementById('ws-overlay').className='overlay open';
   setTimeout(()=>document.getElementById('ws-name').focus(),50);
 }
 async function saveWs(){
   const name=document.getElementById('ws-name').value.trim();if(!name)return;
-  if(editWsId){const w=S.workspaces.find(x=>x.id===editWsId);w.name=name;w.color=wsColor;}
-  else{const w={id:uid(),name,color:wsColor,projects:[],milestones:[]};S.workspaces.push(w);S.activeId=w.id;}
+  if(editWsId){const p=S.projects.find(x=>x.id===editWsId);p.name=name;p.color=wsColor;}
+  else{const p={id:uid(),name,color:wsColor,milestones:[]};S.projects.push(p);S.activeId=p.id;}
   closeOverlay('ws-overlay');await saveWsFile();render();
 }
 async function deleteWs(){
-  const w=S.workspaces.find(x=>x.id===editWsId);if(!confirm(`Delete "${w.name}" and all tasks?`))return;
-  const ids=wsTasks(editWsId).map(t=>t.id);S.tasks=S.tasks.filter(t=>t.workspace!==editWsId);S.workspaces=S.workspaces.filter(x=>x.id!==editWsId);
-  if(S.activeId===editWsId)S.activeId=S.workspaces[0]?.id||null;
+  const p=S.projects.find(x=>x.id===editWsId);if(!confirm(`Delete "${p.name}" and all tasks?`))return;
+  const ids=projTasks(editWsId).map(t=>t.id);S.tasks=S.tasks.filter(t=>t.project!==editWsId);S.projects=S.projects.filter(x=>x.id!==editWsId);
+  if(S.activeId===editWsId)S.activeId=S.projects[0]?.id||null;
   closeOverlay('ws-overlay');await saveWsFile();await Promise.all(ids.map(deleteTaskFile));flashSave();render();
-}
-
-// ── PROJECT OPS ───────────────────────────────────────────────────────────────
-function openProjModal(id=null){
-  editProjId=id;const w=S.workspaces.find(x=>x.id===S.activeId);if(!w)return;
-  const p=id?(w.projects||[]).find(x=>x.id===id):null;
-  projColor=p?p.color:COLORS[Math.floor(Math.random()*COLORS.length)];
-  document.getElementById('proj-modal-title').textContent=id?'Edit Project':'New Project';
-  document.getElementById('proj-name').value=p?p.name:'';
-  document.getElementById('proj-save-btn').textContent=id?'Save':'Create';
-  document.getElementById('proj-del-btn').style.display=id?'block':'none';
-  buildCpicker('proj-cpicker',projColor,c=>projColor=c);
-  document.getElementById('proj-overlay').className='overlay open';
-  setTimeout(()=>document.getElementById('proj-name').focus(),50);
-}
-async function saveProj(){
-  const name=document.getElementById('proj-name').value.trim();if(!name)return;
-  const w=S.workspaces.find(x=>x.id===S.activeId);if(!w)return;if(!w.projects)w.projects=[];
-  if(editProjId){const p=w.projects.find(x=>x.id===editProjId);if(p){p.name=name;p.color=projColor;}}
-  else{w.projects.push({id:uid(),name,color:projColor,milestones:[]});}
-  closeOverlay('proj-overlay');await saveWsFile();render();if(sidebarOpen)renderSidebarPanel();
-}
-async function deleteProj(){
-  const w=S.workspaces.find(x=>x.id===S.activeId);if(!w)return;
-  const p=w.projects.find(x=>x.id===editProjId);if(!confirm(`Delete project "${p.name}"? Tasks will remain but lose project.`))return;
-  w.projects=w.projects.filter(x=>x.id!==editProjId);
-  const affected=S.tasks.filter(t=>t.project===editProjId);affected.forEach(t=>t.project=null);
-  if(projFilter===editProjId)projFilter='all';
-  closeOverlay('proj-overlay');await saveWsFile();await Promise.all(affected.map(persist));render();
 }
 
 // ── MILESTONE OPS ─────────────────────────────────────────────────────────────
 function getMilestoneTarget(){
-  // Milestones go under the active project if one is selected, otherwise workspace-level
-  const w=S.workspaces.find(x=>x.id===S.activeId);if(!w)return null;
-  if(projFilter!=='all'){const p=(w.projects||[]).find(x=>x.id===projFilter);if(p)return p;}
-  return w;
+  return S.projects.find(x=>x.id===S.activeId)||null;
 }
 function openMsModal(id=null){
   editMsId=id;const target=getMilestoneTarget();if(!target)return;
@@ -1257,7 +1153,6 @@ document.addEventListener('keydown',e=>{
   if(inInput){
     if(e.key==='Enter'&&document.activeElement.id==='task-input')addTask();
     if(e.key==='Enter'&&document.activeElement.id==='ws-name')saveWs();
-    if(e.key==='Enter'&&document.activeElement.id==='proj-name')saveProj();
     if(e.key==='Enter'&&document.activeElement.id==='ms-name')saveMs();
     if(e.key==='Escape'){
       if(quickSetOpen){qsClose();return;}
@@ -1281,18 +1176,18 @@ document.addEventListener('keydown',e=>{
   if(e.key==='n'||e.key==='N'){document.getElementById('task-input').focus();return;}
   if(e.key==='/'){e.preventDefault();document.getElementById('search-input').focus();return;}
   if(e.key==='w'||e.key==='W'){toggleSidebar();return;}
-  if(e.key==='Escape'){if(sidebarOpen)closeSidebar();else{closeOverlay('ws-overlay');closeOverlay('proj-overlay');closeOverlay('ms-overlay');expandId=null;renderMain();}}
+  if(e.key==='Escape'){if(sidebarOpen)closeSidebar();else{closeOverlay('ws-overlay');closeOverlay('ms-overlay');expandId=null;renderMain();}}
   const n=parseInt(e.key);
-  if(n>=1&&n<=9&&n<=S.workspaces.length){S.activeId=S.workspaces[n-1].id;projFilter='all';msFilter='all';if(sidebarOpen)renderSidebarPanel();render();}
+  if(n>=1&&n<=9&&n<=S.projects.length){S.activeId=S.projects[n-1].id;msFilter='all';if(sidebarOpen)renderSidebarPanel();render();}
 });
 document.getElementById('task-area').addEventListener('click',e=>{
   if(!e.target.closest('.task-item')&&expandId){expandId=null;renderMain();}
 });
 
 // ── SEED DATA ─────────────────────────────────────────────────────────────────
-const SEED_WORKSPACES = [
-  {id:'ws-1',name:'Work',color:'#3b82f6',milestones:[],projects:[]},
-  {id:'ws-2',name:'Personal',color:'#7c6dfa',milestones:[],projects:[]},
+const SEED_PROJECTS = [
+  {id:'p-work',name:'Work',color:'#3b82f6',milestones:[]},
+  {id:'p-personal',name:'Personal',color:'#7c6dfa',milestones:[]},
 ];
 const SEED_TASKS = [];
 
