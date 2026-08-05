@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Watson Tasks</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root {
   --bg:#0e0e12; --surface:#16161d; --surface2:#1e1e28; --surface3:#26262f;
@@ -285,6 +286,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
         <button class="icon-btn" onclick="openWsModal(true)" title="Edit project">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
+        <button class="icon-btn" id="gsync-btn" onclick="connectGoogle()" title="Connect Google Tasks">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
+        </button>
+        <span id="gsync-status" style="font-size:10px;color:var(--text3);white-space:nowrap;">gtasks: init…</span>
         <button class="icon-btn" id="done-toggle" onclick="toggleShowDone()" title="Show completed">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         </button>
@@ -422,6 +427,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 const COLORS = ['#7c6dfa','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6','#a855f7','#ec4899','#64748b'];
 const PNAMES = ['','Critical','High','Normal','Low'];
 const TODAY = new Date().toISOString().slice(0,10);
+const GTASKS_CLIENT_ID = '448737787932-t4dij2ct39kp1tva3lj3b596g7savg10.apps.googleusercontent.com';
+const GTASKS_SCOPE = 'https://www.googleapis.com/auth/tasks';
+const GTASKS_NOTES_LIMIT = 8000;
 
 // ── STATE ────────────────────────────────────────────────────────────────────
 let rootDir = null, tasksDir = null;
@@ -440,6 +448,19 @@ let notesTimer = {};
 // Modal state
 let editWsId = null, wsColor = COLORS[0];
 let editMsId = null, msColor = COLORS[5];
+
+// Google Tasks sync state
+let gtasksTokenClient = null;
+let gtasksAccessToken = null;
+let gtasksSyncing = false;
+// Serializes every push/pull so a background pull can never race a fresh local
+// push and clobber it with stale data (see: completion-toggle race, 2026-08-05).
+let gtasksQueue = Promise.resolve();
+function gtasksSerial(fn) {
+  const next = gtasksQueue.then(fn, fn);
+  gtasksQueue = next.catch(() => {});
+  return next;
+}
 
 // ── FILE SYSTEM ───────────────────────────────────────────────────────────────
 async function pickFolder() {
@@ -504,6 +525,7 @@ async function initFromDir() {
   S.tasks = await loadAllTasks();
   showApp();
   render();
+  tryRestoreGoogleToken();
 }
 
 function migrateProj(p) {
@@ -569,7 +591,16 @@ function flashSave() {
   clearTimeout(flashSave._t); flashSave._t = setTimeout(() => el.className = '', 1200);
 }
 
-async function persist(t) { flashSave(); await writeTaskFile(t); }
+async function persist(t) {
+  flashSave();
+  await writeTaskFile(t);
+  // Google sync runs queued in the background — never blocks the local save/render,
+  // even if a slow pull is already in flight. Still serialized (gtasksSerial) so it
+  // can't race a concurrent pull and get clobbered.
+  if (gtasksAccessToken) {
+    gtasksSerial(() => pushTaskToGoogle(t)).then(() => writeTaskFile(t));
+  }
+}
 
 // ── IDB ───────────────────────────────────────────────────────────────────────
 function idbOpen() {
@@ -583,6 +614,219 @@ function showApp() {
   document.getElementById('setup').className = '';
   document.getElementById('rail').style.display = 'flex';
   document.getElementById('app-content').style.display = 'flex';
+}
+
+// ── GOOGLE TASKS SYNC ─────────────────────────────────────────────────────────
+// Google Tasks is the sync backbone across devices; local JSON stays the offline
+// mirror/cache. Priority/milestoneId/recur/order/subtasks/snoozeCount have no
+// Google equivalent, so the LOCAL file stays authoritative for those — pulls only
+// ever overlay the fields Google natively supports (title/notes/due/done).
+// Popups only work from a real click — never auto-request a token on page load
+// (the browser silently blocks it, which looked like a silent total sync failure).
+// A previously-issued token is cached in localStorage and reused until it expires
+// (~1hr) so reconnecting isn't needed on every reload.
+function setGStatus(text) {
+  console.log('[gtasks-status]', text);
+  const el = document.getElementById('gsync-status');
+  if (el) el.textContent = 'gtasks: ' + text;
+}
+function ensureTokenClient() {
+  if (gtasksTokenClient) return true;
+  if (!window.google?.accounts?.oauth2) { setGStatus('GIS script not loaded yet'); return false; }
+  gtasksTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GTASKS_CLIENT_ID,
+    scope: GTASKS_SCOPE,
+    callback: onGtasksToken,
+  });
+  return true;
+}
+function tryRestoreGoogleToken() {
+  const tok = localStorage.getItem('wt-gtoken');
+  const exp = parseInt(localStorage.getItem('wt-gtoken-exp') || '0', 10);
+  if (tok && Date.now() < exp) {
+    setGStatus('restored cached token (' + Math.round((exp - Date.now()) / 1000) + 's left)');
+    gtasksAccessToken = tok;
+    updateGsyncIndicator();
+    syncNow();
+  } else {
+    if (!window.google?.accounts?.oauth2) { setGStatus('waiting for GIS script...'); setTimeout(tryRestoreGoogleToken, 300); return; }
+    ensureTokenClient();
+    setGStatus('not connected — click to connect');
+    updateGsyncIndicator();
+  }
+}
+function connectGoogle() {
+  setGStatus('button clicked, requesting popup...');
+  if (!ensureTokenClient()) { setTimeout(connectGoogle, 300); return; }
+  gtasksTokenClient.requestAccessToken({ prompt: '' });
+}
+async function onGtasksToken(resp) {
+  if (resp.error) { setGStatus('auth error: ' + resp.error); gtasksAccessToken = null; updateGsyncIndicator(); return; }
+  setGStatus('connected, syncing...');
+  gtasksAccessToken = resp.access_token;
+  const expiresAt = Date.now() + (parseInt(resp.expires_in, 10) - 60) * 1000; // 60s safety margin
+  localStorage.setItem('wt-gtoken', resp.access_token);
+  localStorage.setItem('wt-gtoken-exp', String(expiresAt));
+  updateGsyncIndicator();
+  await syncNow();
+  setGStatus('connected');
+}
+function updateGsyncIndicator() {
+  const btn = document.getElementById('gsync-btn');
+  if (!btn) return;
+  btn.className = 'icon-btn' + (gtasksAccessToken ? ' on' : '');
+  btn.title = gtasksAccessToken ? 'Google Tasks connected' : 'Connect Google Tasks';
+}
+async function gfetch(path, opts = {}) {
+  if (!gtasksAccessToken) { console.warn('[gtasks] skipped (no token):', opts.method || 'GET', path); return null; }
+  console.log('[gtasks]', opts.method || 'GET', path, opts.body || '');
+  const res = await fetch(`https://tasks.googleapis.com${path}`, {
+    ...opts,
+    headers: { Authorization: `Bearer ${gtasksAccessToken}`, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+  });
+  if (res.status === 401) {
+    console.warn('[gtasks] 401 — token cleared');
+    gtasksAccessToken = null;
+    localStorage.removeItem('wt-gtoken');
+    localStorage.removeItem('wt-gtoken-exp');
+    updateGsyncIndicator();
+    return null;
+  }
+  if (res.status === 204) { console.log('[gtasks] 204 ok'); return {}; }
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) { console.warn('[gtasks] error', res.status, path, json); return null; }
+  console.log('[gtasks] ok', res.status, json.id || '', json.updated || '');
+  return json;
+}
+function truncateNotes(notes) {
+  if (!notes) return notes;
+  return notes.length > GTASKS_NOTES_LIMIT
+    ? notes.slice(0, GTASKS_NOTES_LIMIT) + '\n\n[…truncated for Google Tasks — full notes are in the Watson app/local file]'
+    : notes;
+}
+async function ensureTasklistForProject(p) {
+  if (!gtasksAccessToken) return null;
+  if (p.googleListId) return p.googleListId;
+  const created = await gfetch('/tasks/v1/users/@me/lists', { method: 'POST', body: JSON.stringify({ title: `W: ${p.name}` }) });
+  if (!created?.id) return null;
+  p.googleListId = created.id;
+  await saveWsFile();
+  return p.googleListId;
+}
+async function deleteTasklistForProject(p) {
+  if (!gtasksAccessToken || !p.googleListId) return;
+  await gfetch(`/tasks/v1/users/@me/lists/${p.googleListId}`, { method: 'DELETE' });
+}
+async function pushTaskToGoogle(t) {
+  if (!gtasksAccessToken) return;
+  const proj = S.projects.find(p => p.id === t.project);
+  if (!proj) return;
+  const listId = await ensureTasklistForProject(proj);
+  if (!listId) return;
+
+  const body = { title: t.title || '(untitled)', status: t.done ? 'completed' : 'needsAction' };
+  const notes = truncateNotes(t.notes);
+  if (notes) body.notes = notes;
+  if (t.dueDate) body.due = `${t.dueDate}T00:00:00.000Z`;
+  if (t.done && t.doneAt) body.completed = new Date(t.doneAt).toISOString();
+
+  // Task was reassigned to a different project since its last Google sync -> move it.
+  if (t.googleTaskId && t.googleListId && t.googleListId !== listId) {
+    await gfetch(`/tasks/v1/lists/${t.googleListId}/tasks/${t.googleTaskId}`, { method: 'DELETE' });
+    t.googleTaskId = null;
+  }
+
+  const result = t.googleTaskId
+    ? await gfetch(`/tasks/v1/lists/${listId}/tasks/${t.googleTaskId}`, { method: 'PATCH', body: JSON.stringify(body) })
+    : await gfetch(`/tasks/v1/lists/${listId}/tasks`, { method: 'POST', body: JSON.stringify(body) });
+  if (result?.id) {
+    t.googleTaskId = result.id;
+    t.googleListId = listId;
+    t.googleUpdated = result.updated;
+  }
+}
+async function deleteTaskFromGoogle(t) {
+  if (!gtasksAccessToken || !t?.googleTaskId || !t?.googleListId) return;
+  await gfetch(`/tasks/v1/lists/${t.googleListId}/tasks/${t.googleTaskId}`, { method: 'DELETE' });
+}
+async function fetchAllGoogleTasks(listId) {
+  let items = [];
+  let pageToken;
+  do {
+    const qs = new URLSearchParams({ showCompleted: 'true', showHidden: 'true', maxResults: '100' });
+    if (pageToken) qs.set('pageToken', pageToken);
+    const res = await gfetch(`/tasks/v1/lists/${listId}/tasks?${qs}`);
+    if (!res) break;
+    items = items.concat(res.items || []);
+    pageToken = res.nextPageToken;
+  } while (pageToken);
+  return items;
+}
+function gtaskToLocalFields(gt) {
+  return {
+    title: gt.title || '(untitled)',
+    notes: gt.notes || '',
+    dueDate: gt.due ? gt.due.slice(0, 10) : null,
+    done: gt.status === 'completed',
+    doneAt: gt.completed ? new Date(gt.completed).getTime() : null,
+  };
+}
+async function pullAllFromGoogle() {
+  if (!gtasksAccessToken) return false;
+  let changed = false;
+  for (const p of S.projects) {
+    if (!p.googleListId) continue;
+    const gtasks = await fetchAllGoogleTasks(p.googleListId);
+    const seenIds = new Set();
+    for (const gt of gtasks) {
+      seenIds.add(gt.id);
+      const local = S.tasks.find(t => t.googleTaskId === gt.id);
+      if (local) {
+        if (local.googleUpdated !== gt.updated) {
+          Object.assign(local, gtaskToLocalFields(gt));
+          local.googleUpdated = gt.updated;
+          await writeTaskFile(local);
+          changed = true;
+        }
+      } else {
+        const maxO = Math.max(0, ...projTasks(p.id).map(x => x.order || 0));
+        const nt = {
+          id: uid(), project: p.id, priority: 3, milestoneId: null, recur: null,
+          order: maxO + 1, created: Date.now(),
+          googleTaskId: gt.id, googleListId: p.googleListId, googleUpdated: gt.updated,
+          ...gtaskToLocalFields(gt),
+        };
+        S.tasks.push(nt);
+        await writeTaskFile(nt);
+        changed = true;
+      }
+    }
+    // Deleted on the Google side (phone, gmail, etc.) -> mirror the deletion locally.
+    const toRemove = S.tasks.filter(t => t.googleListId === p.googleListId && t.googleTaskId && !seenIds.has(t.googleTaskId));
+    for (const t of toRemove) {
+      S.tasks = S.tasks.filter(x => x.id !== t.id);
+      await deleteTaskFile(t.id);
+      changed = true;
+    }
+  }
+  return changed;
+}
+async function syncNow() {
+  if (!gtasksAccessToken || gtasksSyncing) { console.log('[gtasks] syncNow skipped (no token or already syncing)'); return; }
+  console.log('[gtasks] syncNow start');
+  const t0 = Date.now();
+  gtasksSyncing = true;
+  try {
+    await gtasksSerial(async () => {
+      const unsynced = S.tasks.filter(t => !t.googleTaskId);
+      for (const t of unsynced) { await pushTaskToGoogle(t); await writeTaskFile(t); }
+      const changed = await pullAllFromGoogle();
+      if (changed || unsynced.length) render();
+    });
+  } finally {
+    gtasksSyncing = false;
+    console.log('[gtasks] syncNow done in', Date.now() - t0, 'ms');
+  }
 }
 
 // ── SIDEBAR ───────────────────────────────────────────────────────────────────
@@ -967,7 +1211,14 @@ function snoozeWarnReschedule() {
     if (el) el.focus();
   }, 50);
 }
-async function delTask(id){S.tasks=S.tasks.filter(x=>x.id!==id);if(expandId===id)expandId=null;await deleteTaskFile(id);flashSave();render();}
+async function delTask(id){
+  const t=S.tasks.find(x=>x.id===id);
+  S.tasks=S.tasks.filter(x=>x.id!==id);
+  if(expandId===id)expandId=null;
+  await deleteTaskFile(id);
+  if(t) gtasksSerial(() => deleteTaskFromGoogle(t));
+  flashSave();render();
+}
 function toggleExpand(id){expandId=expandId===id?null:id;renderMain();}
 function queueSaveNotes(id,v){clearTimeout(notesTimer[id]);notesTimer[id]=setTimeout(async()=>{const t=S.tasks.find(x=>x.id===id);if(t){t.notes=v;await persist(t);}},600);}
 async function updateField(id,field,val){const t=S.tasks.find(x=>x.id===id);if(!t)return;t[field]=val;await persist(t);render();}
@@ -1098,7 +1349,9 @@ async function deleteWs(){
   const p=S.projects.find(x=>x.id===editWsId);if(!confirm(`Delete "${p.name}" and all tasks?`))return;
   const ids=projTasks(editWsId).map(t=>t.id);S.tasks=S.tasks.filter(t=>t.project!==editWsId);S.projects=S.projects.filter(x=>x.id!==editWsId);
   if(S.activeId===editWsId)S.activeId=S.projects[0]?.id||null;
-  closeOverlay('ws-overlay');await saveWsFile();await Promise.all(ids.map(deleteTaskFile));flashSave();render();
+  closeOverlay('ws-overlay');await saveWsFile();await Promise.all(ids.map(deleteTaskFile));
+  await deleteTasklistForProject(p);
+  flashSave();render();
 }
 
 // ── MILESTONE OPS ─────────────────────────────────────────────────────────────
@@ -1183,6 +1436,8 @@ document.addEventListener('keydown',e=>{
 document.getElementById('task-area').addEventListener('click',e=>{
   if(!e.target.closest('.task-item')&&expandId){expandId=null;renderMain();}
 });
+window.addEventListener('focus', () => { if (gtasksAccessToken) syncNow(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && gtasksAccessToken) syncNow(); });
 
 // ── SEED DATA ─────────────────────────────────────────────────────────────────
 const SEED_PROJECTS = [
