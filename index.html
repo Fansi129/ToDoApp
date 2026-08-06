@@ -783,7 +783,12 @@ async function pullAllFromGoogle() {
       const local = S.tasks.find(t => t.googleTaskId === gt.id);
       if (local) {
         if (local.googleUpdated !== gt.updated) {
-          Object.assign(local, gtaskToLocalFields(gt));
+          const fields = gtaskToLocalFields(gt);
+          // Google's copy of notes is truncated at GTASKS_NOTES_LIMIT (API cap).
+          // If local notes are already longer than that, Google's copy is by
+          // definition lossy — never let it overwrite the fuller local original.
+          if (local.notes && local.notes.length > GTASKS_NOTES_LIMIT) delete fields.notes;
+          Object.assign(local, fields);
           local.googleUpdated = gt.updated;
           await writeTaskFile(local);
           changed = true;
@@ -801,13 +806,13 @@ async function pullAllFromGoogle() {
         changed = true;
       }
     }
-    // Deleted on the Google side (phone, gmail, etc.) -> mirror the deletion locally.
-    const toRemove = S.tasks.filter(t => t.googleListId === p.googleListId && t.googleTaskId && !seenIds.has(t.googleTaskId));
-    for (const t of toRemove) {
-      S.tasks = S.tasks.filter(x => x.id !== t.id);
-      await deleteTaskFile(t.id);
-      changed = true;
-    }
+    // NOTE: deliberately NOT auto-deleting local tasks whose googleTaskId is
+    // absent from this fetch. Cursor-based pagination on a large, concurrently
+    // -modified list is not reliably complete-in-one-pass, and treating a
+    // missed page as "deleted on Google" caused real data loss (2026-08-06):
+    // local task got deleted, then recreated from scratch on the next pull
+    // with default priority/done-state. Deletions only ever happen from an
+    // explicit user action in the app now (delTask/deleteWs).
   }
   return changed;
 }
