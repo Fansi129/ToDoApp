@@ -283,7 +283,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
         <input id="search-input" placeholder="Search… (/)">
       </div>
       <div id="topbar-actions">
-        <button class="icon-btn" onclick="openWsModal(true)" title="Edit project">
+        <button class="icon-btn" id="topbar-edit-btn" onclick="openWsModal(true)" title="Edit project">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
         <button class="icon-btn" id="gsync-btn" onclick="connectGoogle()" title="Connect Google Tasks">
@@ -430,6 +430,7 @@ const TODAY = new Date().toISOString().slice(0,10);
 const GTASKS_CLIENT_ID = '448737787932-t4dij2ct39kp1tva3lj3b596g7savg10.apps.googleusercontent.com';
 const GTASKS_SCOPE = 'https://www.googleapis.com/auth/tasks';
 const GTASKS_NOTES_LIMIT = 8000;
+const ALL_ID = '__all__';
 
 // ── STATE ────────────────────────────────────────────────────────────────────
 let rootDir = null, tasksDir = null;
@@ -519,7 +520,7 @@ async function initFromDir() {
     for (const t of SEED_TASKS) await writeTaskFile(t);
   }
   const saved = localStorage.getItem('wt-active');
-  if (saved && S.projects.find(p => p.id === saved)) S.activeId = saved;
+  if (saved && (saved === ALL_ID || S.projects.find(p => p.id === saved))) S.activeId = saved;
   const savedTF = localStorage.getItem('wt-tf');
   if (savedTF) timeFilter = savedTF;
   S.tasks = await loadAllTasks();
@@ -879,6 +880,11 @@ function closeSidebar() {
 function renderSidebarPanel() {
   const list = document.getElementById('ws-list');
   list.innerHTML = '';
+  const allCnt = S.tasks.filter(t => !t.done).length;
+  const allRow = el('div', 'ws-row' + (S.activeId===ALL_ID ? ' active' : ''));
+  allRow.innerHTML = `<span class="ws-dot" style="background:#666"></span><span class="ws-row-name">All Projects</span>${allCnt?`<span class="ws-cnt">${allCnt}</span>`:''}<span class="ws-num">0</span>`;
+  allRow.onclick = () => { S.activeId=ALL_ID; msFilter='all'; closeSidebar(); render(); };
+  list.appendChild(allRow);
   S.projects.forEach((p, i) => {
     const cnt = projTasks(p.id).filter(t => !t.done).length;
     const isActive = p.id === S.activeId;
@@ -900,6 +906,12 @@ function render() {
 function renderRail() {
   const dots = document.getElementById('rail-dots');
   dots.innerHTML = '';
+  const allDot = el('div', 'rail-dot' + (S.activeId===ALL_ID?' active':''));
+  allDot.style.background = '#666';
+  allDot.style.border = '2px dashed ' + (S.activeId===ALL_ID ? '#ffffff80' : 'transparent');
+  allDot.title = 'All Projects';
+  allDot.onclick = () => { S.activeId=ALL_ID; msFilter='all'; render(); if(sidebarOpen)renderSidebarPanel(); };
+  dots.appendChild(allDot);
   S.projects.forEach(p => {
     const d = el('div', 'rail-dot' + (p.id===S.activeId?' active':''));
     d.style.background = p.color;
@@ -910,7 +922,9 @@ function renderRail() {
 }
 
 function renderMain() {
-  const p = S.projects.find(x=>x.id===S.activeId);
+  const p = S.activeId===ALL_ID
+    ? { id: ALL_ID, name: 'All Projects', color: '#666', milestones: [] }
+    : S.projects.find(x=>x.id===S.activeId);
   document.getElementById('no-ws').className = p ? '' : 'show';
   const view = document.getElementById('ws-view');
   if (!p) { view.style.display='none'; return; }
@@ -918,6 +932,7 @@ function renderMain() {
 
   document.getElementById('topbar-dot').style.background = p.color;
   document.getElementById('topbar-name').textContent = p.name;
+  document.getElementById('topbar-edit-btn').style.display = p.id===ALL_ID ? 'none' : '';
 
   renderFilterBar(p);
   renderTodayBar(p);
@@ -1040,7 +1055,9 @@ function visibleTasks(p) {
 }
 
 function taskEl(t, p) {
-  const ms = (p.milestones||[]).find(m=>m.id===t.milestoneId);
+  const showProjBadge = p.id === ALL_ID;
+  const taskProj = showProjBadge ? S.projects.find(x=>x.id===t.project) : null;
+  const ms = showProjBadge ? null : (p.milestones||[]).find(m=>m.id===t.milestoneId);
   const subDone = (t.subtasks||[]).filter(s=>s.done).length;
   const subTotal = (t.subtasks||[]).length;
   const open = expandId===t.id;
@@ -1077,6 +1094,7 @@ function taskEl(t, p) {
         ${t.recur?'<span class="recur-icon" title="Repeating">↻</span>':''}
         ${subTotal>0?`<span class="sub-progress">${subDone}/${subTotal}</span>`:''}
         ${ms?`<span class="tagbadge" style="background:${ms.color||'#666'}">${esc(ms.name)}</span>`:''}
+        ${taskProj?`<span class="tagbadge" style="background:${taskProj.color}">${esc(taskProj.name)}</span>`:''}
         ${t.dueDate?`<span class="dbadge ${dueCls(t.dueDate)}">${fmtDate(t.dueDate)}</span>`:''}
         <span class="pbadge p${t.priority}">P${t.priority}</span>
       </span>
@@ -1135,7 +1153,7 @@ function renderAddSelects(p) {
   const projSel = document.getElementById('add-proj-sel');
   projSel.innerHTML = '';
   S.projects.forEach(pj=>{const o=document.createElement('option');o.value=pj.id;o.textContent=pj.name;projSel.appendChild(o);});
-  projSel.value = p.id;
+  if (p.id !== ALL_ID) projSel.value = p.id;
 
   const msSel = document.getElementById('add-ms-sel');
   msSel.innerHTML = '<option value="">No milestone</option>';
@@ -1143,7 +1161,7 @@ function renderAddSelects(p) {
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
-function projTasks(projId) { return S.tasks.filter(t=>t.project===projId); }
+function projTasks(projId) { return projId === ALL_ID ? S.tasks.slice() : S.tasks.filter(t=>t.project===projId); }
 function byPri(a,b) { if(a.priority!==b.priority)return a.priority-b.priority; if((a.order||0)!==(b.order||0))return(a.order||0)-(b.order||0); return(a.created||0)-(b.created||0); }
 function dueCls(d){if(!d)return'';if(d<TODAY)return'overdue';if(d===TODAY)return'today';return'';}
 function fmtDate(d){if(!d)return'';const[,m,day]=d.split('-');return`${day}/${m}`;}
@@ -1362,6 +1380,7 @@ async function deleteSubtask(taskId, subtaskId) {
 
 // ── PROJECT OPS (top-level; formerly "workspace") ──────────────────────────────
 function openWsModal(edit=false){
+  if (edit && S.activeId===ALL_ID) return;
   editWsId=edit?S.activeId:null;const p=edit?S.projects.find(x=>x.id===S.activeId):null;
   wsColor=p?p.color:COLORS[0];
   document.getElementById('ws-modal-title').textContent=edit?'Edit Project':'New Project';
@@ -1463,6 +1482,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='/'){e.preventDefault();document.getElementById('search-input').focus();return;}
   if(e.key==='w'||e.key==='W'){toggleSidebar();return;}
   if(e.key==='Escape'){if(sidebarOpen)closeSidebar();else{closeOverlay('ws-overlay');closeOverlay('ms-overlay');expandId=null;renderMain();}}
+  if(e.key==='0'){S.activeId=ALL_ID;msFilter='all';if(sidebarOpen)renderSidebarPanel();render();return;}
   const n=parseInt(e.key);
   if(n>=1&&n<=9&&n<=S.projects.length){S.activeId=S.projects[n-1].id;msFilter='all';if(sidebarOpen)renderSidebarPanel();render();}
 });
