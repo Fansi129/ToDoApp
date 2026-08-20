@@ -574,8 +574,15 @@ async function resumeDir() {
 
 async function initFromDir() {
   tasksDir = await rootDir.getDirectoryHandle('tasks', { create: true });
-  let projData = await readJSON('projects.json');
-  if (!projData) {
+  let projData = null;
+  let projReadFailed = false;
+  try {
+    projData = await readJSON('projects.json');
+  } catch (e) {
+    console.error('[init] failed to read projects.json — refusing to seed over it:', e);
+    projReadFailed = true;
+  }
+  if (!projData && !projReadFailed) {
     // One-time fallback migration from the old workspace/project format, if present.
     const wsData = await readJSON('workspaces.json');
     if (wsData) {
@@ -591,7 +598,29 @@ async function initFromDir() {
   if (projData) {
     S.projects = (projData.projects || []).map(migrateProj);
     S.activeId = projData.activeId || S.projects[0]?.id || null;
+  } else if (projReadFailed) {
+    // Never silently seed over a folder we failed to read — that's exactly how the real
+    // project registry got destroyed on 2026-08-20. Stop and surface it instead.
+    document.getElementById('setup-msg').textContent = 'Could not read projects.json in this folder (see console). Nothing was overwritten — reload or re-pick the folder.';
+    document.getElementById('setup-btn').textContent = 'Try again';
+    document.getElementById('setup-btn').onclick = pickFolder;
+    document.getElementById('setup').className = 'show';
+    return;
   } else {
+    // Genuinely no projects.json and no workspaces.json to migrate. Before treating this
+    // as a brand-new folder, double-check there isn't existing task data sitting here
+    // with a merely-missing registry — belt and braces on top of the NotFoundError check.
+    let hasExistingTasks = false;
+    for await (const [name, handle] of tasksDir) {
+      if (handle.kind === 'file' && name.endsWith('.json')) { hasExistingTasks = true; break; }
+    }
+    if (hasExistingTasks) {
+      document.getElementById('setup-msg').textContent = 'This folder has task files but no projects.json. Refusing to auto-create a fresh registry — restore projects.json first, then reload.';
+      document.getElementById('setup-btn').textContent = 'Try again';
+      document.getElementById('setup-btn').onclick = pickFolder;
+      document.getElementById('setup').className = 'show';
+      return;
+    }
     S.projects = SEED_PROJECTS;
     S.activeId = SEED_PROJECTS[0]?.id || null;
     await writeJSON('projects.json', { projects: S.projects, activeId: S.activeId });
@@ -657,7 +686,19 @@ async function deleteTaskFile(id) {
 }
 
 async function readJSON(name) {
-  try { const fh = await rootDir.getFileHandle(name); const f = await fh.getFile(); return JSON.parse(await f.text()); } catch { return null; }
+  // NotFoundError = the file genuinely doesn't exist yet, safe to treat as "absent".
+  // Any other failure (permission hiccup, I/O error, corrupt JSON) must NOT be treated
+  // the same way — initFromDir() responds to "absent" by seeding fresh data over the
+  // folder, and conflating a transient read failure with a fresh folder is exactly what
+  // overwrote the real project registry with seed data on 2026-08-20. Let those propagate.
+  try {
+    const fh = await rootDir.getFileHandle(name);
+    const f = await fh.getFile();
+    return JSON.parse(await f.text());
+  } catch (e) {
+    if (e && e.name === 'NotFoundError') return null;
+    throw e;
+  }
 }
 
 async function writeJSON(name, data) {
