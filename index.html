@@ -233,6 +233,40 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .btn-del{background:#ef444420;border:1px solid #ef444440;color:var(--p1);padding:6px 13px;border-radius:6px;font-size:13px;cursor:pointer;margin-right:auto;}
 .btn-del:hover{background:#ef444430;}
 
+/* ── INITIATIVES ────────────────────────────────────────────────────────────── */
+#init-panel{border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;}
+#init-panel.collapsed #init-panel-body{display:none;}
+#init-panel.collapsed #init-panel-toggle{opacity:.6;}
+#init-panel-head{display:flex;align-items:center;gap:8px;padding:8px 20px;}
+#init-panel-toggle{background:none;border:none;color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;padding:2px 0;flex:1;text-align:left;transition:opacity .1s;}
+#init-add-btn{padding:3px 10px;font-size:12px;}
+#init-panel-body{max-height:180px;overflow-y:auto;padding:0 20px 10px;display:flex;flex-direction:column;gap:6px;}
+#init-empty{display:none;color:var(--text3);font-size:12px;padding:4px 0 8px;}
+#init-empty.show{display:flex;}
+.init-card{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);overflow:hidden;flex-shrink:0;}
+.init-card.done{opacity:.5;}
+.init-head-row{display:flex;align-items:center;gap:9px;padding:10px 12px;cursor:pointer;}
+.init-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.init-name{flex:1;font-size:14px;font-weight:500;}
+.init-name.done{text-decoration:line-through;}
+.init-status{font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--surface3);color:var(--text2);flex-shrink:0;}
+.init-status.active{background:var(--accent-dim);color:var(--accent);}
+.init-progress{font-size:11px;color:var(--text3);white-space:nowrap;flex-shrink:0;}
+.init-edit-btn{background:none;border:none;color:var(--text3);cursor:pointer;padding:2px 4px;border-radius:4px;font-size:13px;opacity:0;transition:opacity .1s,color .1s;flex-shrink:0;}
+.init-card:hover .init-edit-btn{opacity:1;}
+.init-edit-btn:hover{color:var(--accent);}
+.init-tasks{display:none;flex-direction:column;gap:1px;padding:0 12px 10px 31px;border-top:1px solid var(--border);}
+.init-tasks.open{display:flex;padding-top:6px;}
+.init-task-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;}
+.init-task-title{flex:1;cursor:pointer;color:var(--text2);}
+.init-task-title:hover{color:var(--accent);}
+.init-task-title.done{text-decoration:line-through;opacity:.5;}
+.init-task-proj{font-size:9px;padding:1px 5px;border-radius:4px;color:#fff;opacity:.7;flex-shrink:0;}
+.init-empty-tasks{font-size:11px;color:var(--text3);padding:4px 0;}
+.mini-check{width:14px;height:14px;border-radius:50%;border:2px solid var(--border);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:border-color .1s,background .1s;}
+.mini-check:hover{border-color:var(--done-col);}
+.mini-check.done{background:var(--done-col);border-color:var(--done-col);}
+
 ::-webkit-scrollbar{width:4px;} ::-webkit-scrollbar-track{background:transparent;} ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
 </style>
 </head>
@@ -293,6 +327,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
         <button class="icon-btn" id="done-toggle" onclick="toggleShowDone()" title="Show completed">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         </button>
+      </div>
+    </div>
+
+    <!-- Initiatives panel: always on screen, above tasks -->
+    <div id="init-panel">
+      <div id="init-panel-head">
+        <button id="init-panel-toggle" onclick="toggleInitPanel()">▾ Initiatives</button>
+        <button class="icon-btn" id="init-done-toggle" onclick="toggleInitShowDone()" title="Show completed">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </button>
+        <button class="btn-pri" id="init-add-btn" onclick="openInitModal(null)">+ New</button>
+      </div>
+      <div id="init-panel-body">
+        <div id="init-empty">No initiatives yet — track the things that are ongoing here, across any project, so nothing falls between the chairs.</div>
+        <div id="init-list"></div>
       </div>
     </div>
 
@@ -422,6 +471,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
   </div>
 </div>
 
+<!-- Initiative Modal -->
+<div id="init-overlay" class="overlay" onclick="overlayClick(event,'init-overlay')">
+  <div class="modal">
+    <h3 id="init-modal-title">New Initiative</h3>
+    <div class="mfield"><label>Name</label><input id="init-name" class="minput" type="text" placeholder="e.g. Launch mini-course funnel"></div>
+    <div class="mfield"><label>Color</label><div class="cpicker" id="init-cpicker"></div></div>
+    <div class="mfield"><label>Status</label>
+      <select id="init-status" class="minput">
+        <option value="active">Active</option>
+        <option value="done">Done</option>
+      </select>
+    </div>
+    <div class="mactions">
+      <button id="init-del-btn" class="btn-del" onclick="deleteInit()" style="display:none">Delete</button>
+      <button class="btn-sec" onclick="closeOverlay('init-overlay')">Cancel</button>
+      <button class="btn-pri" id="init-save-btn" onclick="saveInit()">Create</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
 const COLORS = ['#7c6dfa','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6','#a855f7','#ec4899','#64748b'];
@@ -434,7 +503,7 @@ const ALL_ID = '__all__';
 
 // ── STATE ────────────────────────────────────────────────────────────────────
 let rootDir = null, tasksDir = null;
-let S = { projects: [], tasks: [], activeId: null };
+let S = { projects: [], tasks: [], initiatives: [], activeId: null };
 let taskFileMap = {}; // id -> current filename on disk
 
 let sidebarOpen = false;
@@ -446,9 +515,15 @@ let expandId = null;
 let dragSrc = null, dragSrcP = null;
 let notesTimer = {};
 
+// Initiatives panel state
+let initPanelCollapsed = localStorage.getItem('wt-init-collapsed') === '1';
+let showInitDone = false;
+let expandInitId = null;
+
 // Modal state
 let editWsId = null, wsColor = COLORS[0];
 let editMsId = null, msColor = COLORS[5];
+let editInitId = null, initColor = COLORS[0];
 
 // Google Tasks sync state
 let gtasksTokenClient = null;
@@ -523,6 +598,8 @@ async function initFromDir() {
   if (saved && (saved === ALL_ID || S.projects.find(p => p.id === saved))) S.activeId = saved;
   const savedTF = localStorage.getItem('wt-tf');
   if (savedTF) timeFilter = savedTF;
+  const initData = await readJSON('initiatives.json');
+  S.initiatives = (initData && initData.initiatives) || [];
   S.tasks = await loadAllTasks();
   showApp();
   render();
@@ -586,6 +663,7 @@ async function writeJSON(name, data) {
 }
 
 async function saveWsFile() { await writeJSON('projects.json', { projects: S.projects, activeId: S.activeId }); }
+async function saveInitiativesFile() { await writeJSON('initiatives.json', { initiatives: S.initiatives }); }
 
 function flashSave() {
   const el = document.getElementById('save-ind'); el.className = 'show';
@@ -699,8 +777,9 @@ async function gfetch(path, opts = {}) {
   console.log('[gtasks] ok', res.status, json.id || '', json.updated || '');
   return json;
 }
-// Google Tasks is now the SOLE source of truth for priority/milestoneId/recur/
-// snoozeCount/subtasks too (not just title/notes/due/done). They're encoded as
+// Google Tasks is now the SOLE source of truth for priority/milestoneId/
+// initiativeId/recur/snoozeCount/subtasks too (not just title/notes/due/done).
+// They're encoded as
 // a hidden JSON tag at the top of `notes`; local JSON is a pure, disposable
 // cache that can always be safely regenerated by re-pulling. This removes the
 // dual-authority split-brain that caused real data loss on 2026-08-06 — see
@@ -708,7 +787,7 @@ async function gfetch(path, opts = {}) {
 // task lives in already is the project.
 const WT_TAG_RE = /^<!-- wt:(.*?) -->\n?\n?/;
 function encodeWtTag(t) {
-  const meta = { p: t.priority ?? 3, m: t.milestoneId ?? null, r: t.recur ?? null, sc: t.snoozeCount ?? 0 };
+  const meta = { p: t.priority ?? 3, m: t.milestoneId ?? null, i: t.initiativeId ?? null, r: t.recur ?? null, sc: t.snoozeCount ?? 0 };
   if (t.subtasks && t.subtasks.length) meta.st = t.subtasks.map(s => ({ t: s.title, d: !!s.done }));
   return `<!-- wt:${JSON.stringify(meta)} -->`;
 }
@@ -798,6 +877,7 @@ function gtaskToLocalFields(gt) {
     // opening quick-set: Normal priority, no milestone/repeat/subtasks.
     priority: meta?.p ?? 3,
     milestoneId: meta?.m ?? null,
+    initiativeId: meta?.i ?? null,
     recur: meta?.r ?? null,
     snoozeCount: meta?.sc ?? 0,
     subtasks: meta?.st ? meta.st.map(s => ({ id: uid(), title: s.t, done: !!s.d })) : [],
@@ -921,6 +1001,62 @@ function renderRail() {
   });
 }
 
+// ── INITIATIVES PANEL ────────────────────────────────────────────────────────
+function toggleInitPanel() {
+  initPanelCollapsed = !initPanelCollapsed;
+  localStorage.setItem('wt-init-collapsed', initPanelCollapsed ? '1' : '0');
+  renderInitiativesView();
+}
+function renderInitiativesView() {
+  document.getElementById('init-panel').classList.toggle('collapsed', initPanelCollapsed);
+  document.getElementById('init-panel-toggle').textContent = (initPanelCollapsed ? '▸' : '▾') + ' Initiatives';
+  document.getElementById('init-done-toggle').className = 'icon-btn' + (showInitDone?' on':'');
+  const list = document.getElementById('init-list');
+  list.innerHTML = '';
+  const visible = S.initiatives
+    .filter(i => showInitDone || i.status !== 'done')
+    .slice()
+    .sort((a,b) => (a.status==='done'?1:0)-(b.status==='done'?1:0) || (a.created||0)-(b.created||0));
+  document.getElementById('init-empty').className = visible.length ? '' : 'show';
+  visible.forEach(ini => list.appendChild(initCardEl(ini)));
+}
+
+function initCardEl(ini) {
+  const linked = S.tasks.filter(t => t.initiativeId === ini.id);
+  const done = linked.filter(t=>t.done).length;
+  const total = linked.length;
+  const open = expandInitId === ini.id;
+  const card = el('div', 'init-card' + (ini.status==='done'?' done':''));
+  card.innerHTML = `
+    <div class="init-head-row" onclick="toggleInitExpand('${ini.id}')">
+      <span class="init-dot" style="background:${ini.color}"></span>
+      <span class="init-name${ini.status==='done'?' done':''}">${esc(ini.name)}</span>
+      <span class="init-status${ini.status==='active'?' active':''}">${ini.status==='done'?'Done':'Active'}</span>
+      ${total?`<span class="init-progress">${done}/${total} tasks</span>`:''}
+      <button class="init-edit-btn" onclick="event.stopPropagation();openInitModal('${ini.id}')" title="Edit">✎</button>
+    </div>
+    <div class="init-tasks${open?' open':''}">
+      ${total ? linked.map(t => {
+        const proj = S.projects.find(p=>p.id===t.project);
+        return `<div class="init-task-row">
+          <div class="mini-check${t.done?' done':''}" onclick="toggleDone('${t.id}')">
+            ${t.done?'<svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.5"><polyline points="1.5 6 4.5 9 10.5 3"/></svg>':''}
+          </div>
+          <span class="init-task-title${t.done?' done':''}" onclick="jumpToTask('${t.id}')">${esc(t.title)}</span>
+          ${proj?`<span class="init-task-proj" style="background:${proj.color}">${esc(proj.name)}</span>`:''}
+        </div>`;
+      }).join('') : '<div class="init-empty-tasks">No tasks linked yet — open a task and set its Initiative field.</div>'}
+    </div>`;
+  return card;
+}
+function toggleInitExpand(id) { expandInitId = expandInitId===id?null:id; renderInitiativesView(); }
+function toggleInitShowDone() { showInitDone = !showInitDone; renderInitiativesView(); }
+function jumpToTask(taskId) {
+  const t = S.tasks.find(x=>x.id===taskId); if (!t) return;
+  S.activeId = t.project; msFilter = 'all'; expandId = t.id;
+  render();
+}
+
 function renderMain() {
   const p = S.activeId===ALL_ID
     ? { id: ALL_ID, name: 'All Projects', color: '#666', milestones: [] }
@@ -929,6 +1065,7 @@ function renderMain() {
   const view = document.getElementById('ws-view');
   if (!p) { view.style.display='none'; return; }
   view.style.display = 'flex';
+  renderInitiativesView();
 
   document.getElementById('topbar-dot').style.background = p.color;
   document.getElementById('topbar-name').textContent = p.name;
@@ -1058,6 +1195,7 @@ function taskEl(t, p) {
   const showProjBadge = p.id === ALL_ID;
   const taskProj = showProjBadge ? S.projects.find(x=>x.id===t.project) : null;
   const ms = showProjBadge ? null : (p.milestones||[]).find(m=>m.id===t.milestoneId);
+  const ini = S.initiatives.find(i=>i.id===t.initiativeId);
   const subDone = (t.subtasks||[]).filter(s=>s.done).length;
   const subTotal = (t.subtasks||[]).length;
   const open = expandId===t.id;
@@ -1094,6 +1232,7 @@ function taskEl(t, p) {
         ${t.recur?'<span class="recur-icon" title="Repeating">↻</span>':''}
         ${subTotal>0?`<span class="sub-progress">${subDone}/${subTotal}</span>`:''}
         ${ms?`<span class="tagbadge" style="background:${ms.color||'#666'}">${esc(ms.name)}</span>`:''}
+        ${ini?`<span class="tagbadge" style="background:${ini.color||'#666'}">🎯 ${esc(ini.name)}</span>`:''}
         ${taskProj?`<span class="tagbadge" style="background:${taskProj.color}">${esc(taskProj.name)}</span>`:''}
         ${t.dueDate?`<span class="dbadge ${dueCls(t.dueDate)}">${fmtDate(t.dueDate)}</span>`:''}
         <span class="pbadge p${t.priority}">P${t.priority}</span>
@@ -1118,6 +1257,10 @@ function taskEl(t, p) {
         <select class="exp-sel" onchange="updateField('${t.id}','milestoneId',this.value||null)">
           <option value="">No milestone</option>
           ${msOpts.map(m=>`<option value="${m.id}"${t.milestoneId===m.id?' selected':''}>${esc(m.name)}</option>`).join('')}
+        </select>
+        <select class="exp-sel" onchange="updateField('${t.id}','initiativeId',this.value||null)" title="Initiative">
+          <option value="">No initiative</option>
+          ${S.initiatives.map(i=>`<option value="${i.id}"${t.initiativeId===i.id?' selected':''}>${esc(i.name)}</option>`).join('')}
         </select>
         <select class="exp-sel" onchange="updateField('${t.id}','recur',this.value||null)" title="Repeat">
           <option value="">No repeat</option>
@@ -1438,6 +1581,36 @@ async function deleteMs(){
   closeOverlay('ms-overlay');await saveWsFile();await Promise.all(affected.map(persist));render();
 }
 
+// ── INITIATIVE OPS ────────────────────────────────────────────────────────────
+function openInitModal(id=null){
+  editInitId=id;
+  const ini=id?S.initiatives.find(x=>x.id===id):null;
+  initColor=ini?ini.color:COLORS[0];
+  document.getElementById('init-modal-title').textContent=id?'Edit Initiative':'New Initiative';
+  document.getElementById('init-name').value=ini?ini.name:'';
+  document.getElementById('init-status').value=ini?ini.status:'active';
+  document.getElementById('init-save-btn').textContent=id?'Save':'Create';
+  document.getElementById('init-del-btn').style.display=id?'block':'none';
+  buildCpicker('init-cpicker',initColor,c=>initColor=c);
+  document.getElementById('init-overlay').className='overlay open';
+  setTimeout(()=>document.getElementById('init-name').focus(),50);
+}
+async function saveInit(){
+  const name=document.getElementById('init-name').value.trim();if(!name)return;
+  const status=document.getElementById('init-status').value;
+  if(editInitId){const ini=S.initiatives.find(x=>x.id===editInitId);if(ini){ini.name=name;ini.color=initColor;ini.status=status;}}
+  else{S.initiatives.push({id:uid(),name,color:initColor,status,created:Date.now()});}
+  closeOverlay('init-overlay');await saveInitiativesFile();render();
+}
+async function deleteInit(){
+  const ini=S.initiatives.find(x=>x.id===editInitId);if(!ini)return;
+  if(!confirm(`Delete initiative "${ini.name}"? Linked tasks will be unlinked, not deleted.`))return;
+  S.initiatives=S.initiatives.filter(x=>x.id!==editInitId);
+  const affected=S.tasks.filter(t=>t.initiativeId===editInitId);
+  affected.forEach(t=>t.initiativeId=null);
+  closeOverlay('init-overlay');await saveInitiativesFile();await Promise.all(affected.map(persist));render();
+}
+
 // ── MODALS ────────────────────────────────────────────────────────────────────
 function overlayClick(e,id){if(e.target===document.getElementById(id))closeOverlay(id);}
 function closeOverlay(id){document.getElementById(id).className='overlay';}
@@ -1459,6 +1632,7 @@ document.addEventListener('keydown',e=>{
     if(e.key==='Enter'&&document.activeElement.id==='task-input')addTask();
     if(e.key==='Enter'&&document.activeElement.id==='ws-name')saveWs();
     if(e.key==='Enter'&&document.activeElement.id==='ms-name')saveMs();
+    if(e.key==='Enter'&&document.activeElement.id==='init-name')saveInit();
     if(e.key==='Escape'){
       if(quickSetOpen){qsClose();return;}
       document.activeElement.blur();searchQ='';document.getElementById('search-input').value='';expandId=null;renderMain();
@@ -1481,7 +1655,8 @@ document.addEventListener('keydown',e=>{
   if(e.key==='n'||e.key==='N'){document.getElementById('task-input').focus();return;}
   if(e.key==='/'){e.preventDefault();document.getElementById('search-input').focus();return;}
   if(e.key==='w'||e.key==='W'){toggleSidebar();return;}
-  if(e.key==='Escape'){if(sidebarOpen)closeSidebar();else{closeOverlay('ws-overlay');closeOverlay('ms-overlay');expandId=null;renderMain();}}
+  if(e.key==='i'||e.key==='I'){toggleInitPanel();return;}
+  if(e.key==='Escape'){if(sidebarOpen)closeSidebar();else{closeOverlay('ws-overlay');closeOverlay('ms-overlay');closeOverlay('init-overlay');expandId=null;renderMain();}}
   if(e.key==='0'){S.activeId=ALL_ID;msFilter='all';if(sidebarOpen)renderSidebarPanel();render();return;}
   const n=parseInt(e.key);
   if(n>=1&&n<=9&&n<=S.projects.length){S.activeId=S.projects[n-1].id;msFilter='all';if(sidebarOpen)renderSidebarPanel();render();}
