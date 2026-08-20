@@ -212,6 +212,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 #no-ws.show{display:flex;}
 #save-ind{position:fixed;bottom:14px;right:14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 11px;font-size:12px;color:var(--text2);opacity:0;transition:opacity .2s;pointer-events:none;z-index:9999;}
 #save-ind.show{opacity:1;}
+#sync-warn{position:fixed;bottom:52px;right:14px;background:#dc2626;color:#fff;border-radius:6px;padding:8px 14px;font-size:12px;font-weight:600;opacity:0;transform:translateY(6px);transition:opacity .2s,transform .2s;pointer-events:none;z-index:10000;max-width:280px;box-shadow:0 4px 12px rgba(0,0,0,.35);}
+#sync-warn.show{opacity:1;transform:translateY(0);}
 
 /* ── MODALS ─────────────────────────────────────────────────────────────────── */
 .overlay{display:none;position:fixed;inset:0;background:#00000088;z-index:500;align-items:center;justify-content:center;}
@@ -427,6 +429,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 </div>
 
 <div id="save-ind">Saving…</div>
+<div id="sync-warn"></div>
 
 <!-- Project Modal -->
 <div id="ws-overlay" class="overlay" onclick="overlayClick(event,'ws-overlay')">
@@ -670,6 +673,20 @@ function flashSave() {
   clearTimeout(flashSave._t); flashSave._t = setTimeout(() => el.className = '', 1200);
 }
 
+// Distinct from flashSave(): flashSave only confirms the LOCAL file write, which
+// always succeeds. This fires whenever the Google half of that same edit did not
+// go through, so a disconnect or a failed push is never silently invisible.
+function showSyncWarning(msg) {
+  console.warn('[gtasks] sync warning:', msg);
+  setGStatus('NOT synced — ' + msg);
+  const el = document.getElementById('sync-warn');
+  if (!el) return;
+  el.textContent = '⚠ ' + msg;
+  el.className = 'show';
+  clearTimeout(showSyncWarning._t);
+  showSyncWarning._t = setTimeout(() => el.className = '', 5000);
+}
+
 async function persist(t) {
   flashSave();
   await writeTaskFile(t);
@@ -677,7 +694,14 @@ async function persist(t) {
   // even if a slow pull is already in flight. Still serialized (gtasksSerial) so it
   // can't race a concurrent pull and get clobbered.
   if (gtasksAccessToken) {
-    gtasksSerial(() => pushTaskToGoogle(t)).then(() => writeTaskFile(t));
+    gtasksSerial(() => pushTaskToGoogle(t)).then(async ok => {
+      t.dirty = !ok;
+      if (!ok) showSyncWarning(`"${t.title || 'task'}" saved locally but failed to sync to Google`);
+      await writeTaskFile(t);
+    });
+  } else {
+    t.dirty = true;
+    showSyncWarning(`Google Tasks is disconnected — "${t.title || 'task'}" saved locally only`);
   }
 }
 
@@ -769,6 +793,7 @@ async function gfetch(path, opts = {}) {
     localStorage.removeItem('wt-gtoken');
     localStorage.removeItem('wt-gtoken-exp');
     updateGsyncIndicator();
+    showSyncWarning('Google Tasks disconnected (token expired) — reconnect to resume syncing');
     return null;
   }
   if (res.status === 204) { console.log('[gtasks] 204 ok'); return {}; }
@@ -822,11 +847,11 @@ async function deleteTasklistForProject(p) {
   await gfetch(`/tasks/v1/users/@me/lists/${p.googleListId}`, { method: 'DELETE' });
 }
 async function pushTaskToGoogle(t) {
-  if (!gtasksAccessToken) return;
+  if (!gtasksAccessToken) return false;
   const proj = S.projects.find(p => p.id === t.project);
-  if (!proj) return;
+  if (!proj) return false;
   const listId = await ensureTasklistForProject(proj);
-  if (!listId) return;
+  if (!listId) return false;
 
   const body = { title: t.title || '(untitled)', status: t.done ? 'completed' : 'needsAction' };
   body.notes = buildGoogleNotes(t);
@@ -846,7 +871,9 @@ async function pushTaskToGoogle(t) {
     t.googleTaskId = result.id;
     t.googleListId = listId;
     t.googleUpdated = result.updated;
+    return true;
   }
+  return false;
 }
 async function deleteTaskFromGoogle(t) {
   if (!gtasksAccessToken || !t?.googleTaskId || !t?.googleListId) return;
@@ -932,8 +959,19 @@ async function syncNow() {
   gtasksSyncing = true;
   try {
     await gtasksSerial(async () => {
-      const unsynced = S.tasks.filter(t => !t.googleTaskId);
-      for (const t of unsynced) { await pushTaskToGoogle(t); await writeTaskFile(t); }
+      // Retries tasks that never got a googleTaskId AND tasks whose last push
+      // failed (t.dirty) — previously only the former was retried, so a single
+      // dropped PATCH (network blip, expired token mid-edit) left that task
+      // silently stuck out of sync forever, with nothing surfacing the failure.
+      const unsynced = S.tasks.filter(t => !t.googleTaskId || t.dirty);
+      let failures = 0;
+      for (const t of unsynced) {
+        const ok = await pushTaskToGoogle(t);
+        t.dirty = !ok;
+        if (!ok) failures++;
+        await writeTaskFile(t);
+      }
+      if (failures) showSyncWarning(`${failures} task${failures > 1 ? 's' : ''} still not synced to Google`);
       const changed = await pullAllFromGoogle();
       if (changed || unsynced.length) render();
     });
@@ -1345,6 +1383,13 @@ async function spawnNextRecurrence(t) {
     created: Date.now(),
     dueDate: t.dueDate ? nextRecurDate(t.dueDate, t.recur) : nextRecurDate(null, t.recur),
     order: t.order,
+    // Without this, `next` inherits t's googleTaskId and the NEXT edit to this
+    // recurrence PATCHes the already-completed original Google task instead of
+    // creating a new one -- one Google task ends up shared by every cycle while
+    // local keeps spawning a new file each time, and they drift apart for good.
+    googleTaskId: null,
+    googleListId: null,
+    googleUpdated: null,
   };
   S.tasks.push(next);
   await writeTaskFile(next);
