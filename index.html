@@ -257,8 +257,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .init-edit-btn{background:none;border:none;color:var(--text3);cursor:pointer;padding:2px 4px;border-radius:4px;font-size:13px;opacity:0;transition:opacity .1s,color .1s;flex-shrink:0;}
 .init-card:hover .init-edit-btn{opacity:1;}
 .init-edit-btn:hover{color:var(--accent);}
+.init-edit-btn:disabled{opacity:.15!important;cursor:default;}
 .init-tasks{display:none;flex-direction:column;gap:1px;padding:0 12px 10px 31px;border-top:1px solid var(--border);}
 .init-tasks.open{display:flex;padding-top:6px;}
+.init-goal{font-size:12px;color:var(--text2);padding:6px 0 2px;}
+.init-goal-label{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;margin-right:4px;}
+.init-notes{font-size:12px;color:var(--text3);white-space:pre-wrap;padding:0 0 8px;}
 .init-task-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;}
 .init-task-title{flex:1;cursor:pointer;color:var(--text2);}
 .init-task-title:hover{color:var(--accent);}
@@ -486,6 +490,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
         <option value="done">Done</option>
       </select>
     </div>
+    <div class="mfield"><label>Current Goal</label><input id="init-goal" class="minput" type="text" placeholder="What are we driving toward right now?"></div>
+    <div class="mfield"><label>Notes</label><textarea id="init-notes" class="minput" rows="3" placeholder="Notes…"></textarea></div>
     <div class="mactions">
       <button id="init-del-btn" class="btn-del" onclick="deleteInit()" style="display:none">Delete</button>
       <button class="btn-sec" onclick="closeOverlay('init-overlay')">Cancel</button>
@@ -632,6 +638,13 @@ async function initFromDir() {
   if (savedTF) timeFilter = savedTF;
   const initData = await readJSON('initiatives.json');
   S.initiatives = (initData && initData.initiatives) || [];
+  if (S.initiatives.some(i => i.order === undefined)) {
+    S.initiatives
+      .slice()
+      .sort((a,b) => (a.status==='done'?1:0)-(b.status==='done'?1:0) || (a.created||0)-(b.created||0))
+      .forEach((ini,idx) => { ini.order = idx; });
+    await saveInitiativesFile();
+  }
   S.tasks = await loadAllTasks();
   showApp();
   render();
@@ -1086,21 +1099,34 @@ function toggleInitPanel() {
   localStorage.setItem('wt-init-collapsed', initPanelCollapsed ? '1' : '0');
   renderInitiativesView();
 }
+function visibleInitiatives() {
+  return S.initiatives
+    .filter(i => showInitDone || i.status !== 'done')
+    .slice()
+    .sort((a,b) => (a.status==='done'?1:0)-(b.status==='done'?1:0) || (a.order??0)-(b.order??0));
+}
 function renderInitiativesView() {
   document.getElementById('init-panel').classList.toggle('collapsed', initPanelCollapsed);
   document.getElementById('init-panel-toggle').textContent = (initPanelCollapsed ? '▸' : '▾') + ' Initiatives';
   document.getElementById('init-done-toggle').className = 'icon-btn' + (showInitDone?' on':'');
   const list = document.getElementById('init-list');
   list.innerHTML = '';
-  const visible = S.initiatives
-    .filter(i => showInitDone || i.status !== 'done')
-    .slice()
-    .sort((a,b) => (a.status==='done'?1:0)-(b.status==='done'?1:0) || (a.created||0)-(b.created||0));
+  const visible = visibleInitiatives();
   document.getElementById('init-empty').className = visible.length ? '' : 'show';
-  visible.forEach(ini => list.appendChild(initCardEl(ini)));
+  visible.forEach((ini,idx) => list.appendChild(initCardEl(ini, idx===0, idx===visible.length-1)));
+}
+async function moveInit(id, dir) {
+  const list = visibleInitiatives();
+  const idx = list.findIndex(i => i.id === id);
+  const swapIdx = idx + dir;
+  if (idx < 0 || swapIdx < 0 || swapIdx >= list.length) return;
+  const a = list[idx], b = list[swapIdx];
+  const tmp = a.order ?? 0; a.order = b.order ?? 0; b.order = tmp;
+  await saveInitiativesFile();
+  renderInitiativesView();
 }
 
-function initCardEl(ini) {
+function initCardEl(ini, isFirst, isLast) {
   const linked = S.tasks.filter(t => t.initiativeId === ini.id);
   const done = linked.filter(t=>t.done).length;
   const total = linked.length;
@@ -1112,9 +1138,13 @@ function initCardEl(ini) {
       <span class="init-name${ini.status==='done'?' done':''}">${esc(ini.name)}</span>
       <span class="init-status${ini.status==='active'?' active':''}">${ini.status==='done'?'Done':'Active'}</span>
       ${total?`<span class="init-progress">${done}/${total} tasks</span>`:''}
+      <button class="init-edit-btn" onclick="event.stopPropagation();moveInit('${ini.id}',-1)" title="Move up"${isFirst?' disabled':''}>▲</button>
+      <button class="init-edit-btn" onclick="event.stopPropagation();moveInit('${ini.id}',1)" title="Move down"${isLast?' disabled':''}>▼</button>
       <button class="init-edit-btn" onclick="event.stopPropagation();openInitModal('${ini.id}')" title="Edit">✎</button>
     </div>
     <div class="init-tasks${open?' open':''}">
+      ${ini.goal?`<div class="init-goal"><span class="init-goal-label">Goal</span> ${esc(ini.goal)}</div>`:''}
+      ${ini.notes?`<div class="init-notes">${esc(ini.notes)}</div>`:''}
       ${total ? linked.map(t => {
         const proj = S.projects.find(p=>p.id===t.project);
         return `<div class="init-task-row">
@@ -1675,6 +1705,8 @@ function openInitModal(id=null){
   document.getElementById('init-modal-title').textContent=id?'Edit Initiative':'New Initiative';
   document.getElementById('init-name').value=ini?ini.name:'';
   document.getElementById('init-status').value=ini?ini.status:'active';
+  document.getElementById('init-goal').value=ini?(ini.goal||''):'';
+  document.getElementById('init-notes').value=ini?(ini.notes||''):'';
   document.getElementById('init-save-btn').textContent=id?'Save':'Create';
   document.getElementById('init-del-btn').style.display=id?'block':'none';
   buildCpicker('init-cpicker',initColor,c=>initColor=c);
@@ -1684,8 +1716,10 @@ function openInitModal(id=null){
 async function saveInit(){
   const name=document.getElementById('init-name').value.trim();if(!name)return;
   const status=document.getElementById('init-status').value;
-  if(editInitId){const ini=S.initiatives.find(x=>x.id===editInitId);if(ini){ini.name=name;ini.color=initColor;ini.status=status;}}
-  else{S.initiatives.push({id:uid(),name,color:initColor,status,created:Date.now()});}
+  const goal=document.getElementById('init-goal').value.trim();
+  const notes=document.getElementById('init-notes').value.trim();
+  if(editInitId){const ini=S.initiatives.find(x=>x.id===editInitId);if(ini){ini.name=name;ini.color=initColor;ini.status=status;ini.goal=goal;ini.notes=notes;}}
+  else{const order=S.initiatives.length?Math.max(...S.initiatives.map(i=>i.order??0))+1:0;S.initiatives.push({id:uid(),name,color:initColor,status,goal,notes,order,created:Date.now()});}
   closeOverlay('init-overlay');await saveInitiativesFile();render();
 }
 async function deleteInit(){
