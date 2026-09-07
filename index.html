@@ -1786,6 +1786,11 @@ document.getElementById('task-area').addEventListener('click',e=>{
 });
 window.addEventListener('focus', () => { if (gtasksAccessToken) syncNow(); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && gtasksAccessToken) syncNow(); });
+// Focus/visibility alone miss the common case of the tab staying open and
+// foregrounded while a task is added elsewhere (phone, Google Tasks web) —
+// nothing ever re-fires those events. Poll while visible so a task added on
+// another device shows up without the user having to alt-tab away and back.
+setInterval(() => { if (gtasksAccessToken && document.visibilityState === 'visible') syncNow(); }, 60000);
 
 // ── SEED DATA ─────────────────────────────────────────────────────────────────
 const SEED_PROJECTS = [
